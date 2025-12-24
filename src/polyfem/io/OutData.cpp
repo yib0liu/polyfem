@@ -1038,13 +1038,14 @@ namespace polyfem::io
 			}
 			else if (mesh.is_cube(i) && mesh.is_volume())
 			{
-				const int n_nodes = elements[i].size();
+				const int n_nodes = elements[i].vertices.size();
 				if (disc_orders(i) == 2)  // Lagrange hex, order=2
 				{
-					std::swap(elements[i][12], elements[i][16]);
-					std::swap(elements[i][13], elements[i][17]);
-					std::swap(elements[i][14], elements[i][18]);
-					std::swap(elements[i][15], elements[i][19]);
+					std::swap(elements[i].vertices[12], elements[i].vertices[16]);
+					std::swap(elements[i].vertices[13], elements[i].vertices[17]);
+					std::swap(elements[i].vertices[14], elements[i].vertices[18]);
+					std::swap(elements[i].vertices[15], elements[i].vertices[19]);
+					std::swap(elements[i].vertices[18], elements[i].vertices[19]);  // a hack fix
 				}
 				if (disc_orders(i) > 2)
 					error_msg = "Saving high-order meshes not implemented for P2+ elements!";
