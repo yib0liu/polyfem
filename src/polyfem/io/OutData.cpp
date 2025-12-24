@@ -1027,6 +1027,19 @@ namespace polyfem::io
 						error_msg = "Saving high-order meshes not implemented for P5+ elements!";
 				}
 			}
+			else if (mesh.is_cube(i) && mesh.is_volume())
+			{
+				const int n_nodes = elements[i].size();
+				if (disc_orders(i) == 2)  // Lagrange hex, order=2
+				{
+					std::swap(elements[i][12], elements[i][16]);
+					std::swap(elements[i][13], elements[i][17]);
+					std::swap(elements[i][14], elements[i][18]);
+					std::swap(elements[i][15], elements[i][19]);
+				}
+				if (disc_orders(i) > 2)
+					error_msg = "Saving high-order meshes not implemented for P2+ elements!";
+			}
 			else if (disc_orders(i) > 1)
 				error_msg = "Saving high-order meshes not implemented for Q2+ elements!";
 		}
