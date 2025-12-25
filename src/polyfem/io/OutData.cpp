@@ -1047,20 +1047,20 @@ namespace polyfem::io
 					std::swap(elements[i].vertices[15], elements[i].vertices[19]);
 					std::swap(elements[i].vertices[18], elements[i].vertices[19]);  // a hack fix
 				}
-				if (disc_orders(i) == 3)  // Incomplete fix, need to fix order on the edge
-				{
-					std::swap(elements[i].vertices[24], elements[i].vertices[16]);
-					std::swap(elements[i].vertices[25], elements[i].vertices[17]);
-					std::swap(elements[i].vertices[26], elements[i].vertices[18]);
-					std::swap(elements[i].vertices[27], elements[i].vertices[19]);
-					std::swap(elements[i].vertices[28], elements[i].vertices[20]);
-					std::swap(elements[i].vertices[29], elements[i].vertices[21]);
-					std::swap(elements[i].vertices[30], elements[i].vertices[22]);
-					std::swap(elements[i].vertices[31], elements[i].vertices[23]);
-					std::swap(elements[i].vertices[28], elements[i].vertices[30]);  // hack
-					std::swap(elements[i].vertices[29], elements[i].vertices[31]);  // hack
-				}
-				if (disc_orders(i) > 3)
+				// if (disc_orders(i) == 3)  // Incomplete fix, need to fix order on the edge
+				// {
+				// 	std::swap(elements[i].vertices[24], elements[i].vertices[16]);
+				// 	std::swap(elements[i].vertices[25], elements[i].vertices[17]);
+				// 	std::swap(elements[i].vertices[26], elements[i].vertices[18]);
+				// 	std::swap(elements[i].vertices[27], elements[i].vertices[19]);
+				// 	std::swap(elements[i].vertices[28], elements[i].vertices[20]);
+				// 	std::swap(elements[i].vertices[29], elements[i].vertices[21]);
+				// 	std::swap(elements[i].vertices[30], elements[i].vertices[22]);
+				// 	std::swap(elements[i].vertices[31], elements[i].vertices[23]);
+				// 	std::swap(elements[i].vertices[28], elements[i].vertices[30]);  // hack
+				// 	std::swap(elements[i].vertices[29], elements[i].vertices[31]);  // hack
+				// }
+				if (disc_orders(i) > 2)
 					error_msg = "Saving high-order meshes not implemented for P2+ elements!";
 			}
 			else if (disc_orders(i) > 1)
