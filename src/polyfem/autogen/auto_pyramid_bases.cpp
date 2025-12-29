@@ -306,6 +306,29 @@ void pyramid_nodes_3d(const int o, Eigen::MatrixXd &val){
 switch(o){
 	case 1: pyramid_1_nodes_3d(val); break;
 	case 2: pyramid_2_nodes_3d(val); break;
+	case -1:
+		val.resize(19, 3);
+		val << 0.0,
+				0.0, 0.0,
+				1.0, 0.0, 0.0,
+				1.0, 1.0, 0.0,
+				0.0, 1.0, 0.0,
+				0.0, 0.0, 1.0,
+				0.5, 0.0, 0.0,
+				1.0, 0.5, 0.0,
+				0.5, 1.0, 0.0,
+				0.0, 0.5, 0.0,
+				0.0, 0.0, 0.5,
+				0.5, 0.0, 0.5,
+				0.5, 0.5, 0.5,
+				0.0, 0.5, 0.5,
+				0.5, 0.5, 0.0,
+				0.25, 0.0, 0.5,
+				0.5, 0.25, 0.5,
+				0.25, 0.5, 0.5,
+				0.0, 0.25, 0.5,
+				0.25, 0.25, 0.5;
+		break;
 	default: assert(false);
 }}
 void pyramid_basis_value_3d(const int o, const int local_index, const Eigen::MatrixXd &uv, Eigen::MatrixXd &val){

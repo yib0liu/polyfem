@@ -970,7 +970,7 @@ namespace polyfem::io
 				}
 				else if (mesh.is_pyramid(i))
 				{
-					autogen::pyramid_nodes_3d(disc_orders(i), ref_pts);
+					autogen::pyramid_nodes_3d(disc_orders(i) == 2 ? -1 : disc_orders(i), ref_pts);
 				}
 				else
 					continue;
@@ -1017,7 +1017,7 @@ namespace polyfem::io
 				}
 				else if (mesh.is_pyramid(i))
 				{
-					autogen::pyramid_nodes_3d(disc_orders(i), ref_pts);
+					autogen::pyramid_nodes_3d(disc_orders(i) == 2 ? -1 : disc_orders(i), ref_pts);
 				}
 				else
 					continue;
@@ -1789,7 +1789,8 @@ namespace polyfem::io
 						else if (mesh.is_prism(e))
 							autogen::prism_nodes_3d(disc_orders(e), disc_ordersq(e), local_pts);
 						else if (mesh.is_pyramid(e))
-							autogen::pyramid_nodes_3d(disc_orders(e), local_pts);
+							autogen::pyramid_nodes_3d(disc_orders(e) == 2 ? -1 : disc_orders(e), local_pts);
+
 						else
 							continue;
 					}
