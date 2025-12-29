@@ -22,7 +22,20 @@ result_0 = x*(helper_0 + y)/helper_0;} break;
 result_0 = y*(helper_0 + x)/helper_0;} break;
 	case 4: {result_0 = z;} break;
 	default: assert(false);
-}}
+}
+
+if(local_index !=4)
+{
+	for(int i=0;i<x.size();++i)
+	{
+		if(std::abs(x(i))<1e-8 && std::abs(y(i))<1e-8 && std::abs(z(i)-1)<1e-8)
+		{
+			result_0(i)=0;
+		}
+	}
+}
+
+}
 void pyramid_1_basis_grad_value_3d(const int local_index, const Eigen::MatrixXd &uv, Eigen::MatrixXd &val){
 
 auto x=uv.col(0).array();
@@ -110,7 +123,18 @@ result_0 = 4*y*z*(helper_0 + x)/helper_0;} break;
 const auto helper_1 = x*y;
 result_0 = 16*helper_1*(helper_0 + helper_1 + x*z - x + y*z - y)/helper_0;} break;
 	default: assert(false);
-}}
+}
+if(local_index !=4)
+{
+	for(int i=0;i<x.size();++i)
+	{
+		if(std::abs(x(i))<1e-8 && std::abs(y(i))<1e-8 && std::abs(z(i)-1)<1e-8)
+		{
+			result_0(i)=0;
+		}
+	}
+}
+}
 void pyramid_2_basis_grad_value_3d(const int local_index, const Eigen::MatrixXd &uv, Eigen::MatrixXd &val){
 
 auto x=uv.col(0).array();

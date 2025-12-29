@@ -274,6 +274,7 @@ namespace polyfem
 
 			Navigation3D::Index get_index_from_element_edge(int hi, int v0, int v1) const override;
 			Navigation3D::Index get_index_from_element_face(int hi, int v0, int v1, int v2) const override;
+			Navigation3D::Index get_index_from_element_faceq(int hi, int v0, int v1, int v2, int v3) const; // on override
 
 			std::vector<uint32_t> vertex_neighs(const int v_gid) const override;
 			std::vector<uint32_t> edge_neighs(const int e_gid) const override;
@@ -377,6 +378,14 @@ namespace polyfem
 				}
 			};
 
+			struct ArrayHasher4D
+			{
+				long operator()(const Eigen::Vector4i &a) const
+				{
+					return (long)((long)984120265 * a[0] + (long)125965121 * a[1] + (long)495698413 * a[2] + (long)187331941 * a[3]);
+				}
+			};
+
 		protected:
 			bool load(const std::string &path) override;
 			bool load(const GEO::Mesh &M) override;
@@ -446,7 +455,9 @@ namespace polyfem
 
 			// find the face, return -1 if not exists
 			int find_face(Eigen::Vector3i v) const;
+			int find_face(Eigen::Vector4i v) const;
 			int find_face(const int v1, const int v2, const int v3) const { return find_face(Eigen::Vector3i(v1, v2, v3)); };
+			int find_face(const int v1, const int v2, const int v3, const int v4) const { return find_face(Eigen::Vector4i(v1, v2, v3, v4)); };
 			// find the face, create one if not exists
 			int get_face(Eigen::Vector3i v);
 			int get_face(const int v1, const int v2, const int v3) { return get_face(Eigen::Vector3i(v1, v2, v3)); };
@@ -474,6 +485,7 @@ namespace polyfem
 			std::unordered_map<Eigen::Vector2i, int, ArrayHasher2D> midpointMap;
 			std::unordered_map<Eigen::Vector2i, int, ArrayHasher2D> edgeMap;
 			std::unordered_map<Eigen::Vector3i, int, ArrayHasher3D> faceMap;
+			std::unordered_map<Eigen::Vector4i, int, ArrayHasher4D> faceMapq;
 
 			std::vector<int> all_to_valid_elemMap, valid_to_all_elemMap;
 			std::vector<int> all_to_valid_vertexMap, valid_to_all_vertexMap;

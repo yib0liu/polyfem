@@ -41,6 +41,7 @@
 #include <polyfem/autogen/auto_p_bases.hpp>
 #include <polyfem/autogen/auto_q_bases.hpp>
 #include <polyfem/autogen/prism_bases.hpp>
+#include <polyfem/autogen/auto_pyramid_bases.hpp>
 
 #include <paraviewo/VTMWriter.hpp>
 #include <paraviewo/PVDWriter.hpp>
@@ -556,6 +557,10 @@ namespace polyfem::io
 					utils::BoundarySampler::normal_for_prism_face(lb[k], tmp_n);
 					utils::BoundarySampler::sample_parametric_prism_face(lb[k], n_samples, uv, local_pts);
 					break;
+				case BoundaryType::PYRAMID:
+					utils::BoundarySampler::normal_for_pyramid_face(lb[k], tmp_n);
+					utils::BoundarySampler::sample_parametric_pyramid_face(lb[k], n_samples, uv, local_pts);
+					break;
 				case BoundaryType::POLYGON:
 					utils::BoundarySampler::normal_for_polygon_edge(lb.element_id(), lb.global_primitive_id(k), mesh, tmp_n);
 					utils::BoundarySampler::sample_polygon_edge(lb.element_id(), lb.global_primitive_id(k), n_samples, mesh, uv, local_pts);
@@ -583,7 +588,10 @@ namespace polyfem::io
 					const bool prism_quad = lb.type() == BoundaryType::PRISM && lb[k] >= 2;
 					const bool prism_tri = lb.type() == BoundaryType::PRISM && lb[k] < 2;
 
-					if (lb.type() == BoundaryType::QUAD || prism_quad)
+					const bool pyramid_quad = lb.type() == BoundaryType::PYRAMID && lb[k] == 0;
+					const bool pyramid_tri = lb.type() == BoundaryType::PYRAMID && lb[k] > 0;
+
+					if (lb.type() == BoundaryType::QUAD || prism_quad || pyramid_quad)
 					{
 						const auto map = [n_samples, size](int i, int j) { return j * n_samples + i + size; };
 
@@ -596,7 +604,7 @@ namespace polyfem::io
 							}
 						}
 					}
-					else if (lb.type() == BoundaryType::TRI || prism_tri)
+					else if (lb.type() == BoundaryType::TRI || prism_tri || pyramid_tri)
 					{
 						int index = 0;
 						std::vector<int> mapp(n_samples * n_samples, -1);
@@ -796,6 +804,11 @@ namespace polyfem::io
 				tet_total_size += sampler.prism_volume().rows();
 				pts_total_size += sampler.prism_points().rows();
 			}
+			else if (mesh.is_pyramid(i))
+			{
+				tet_total_size += sampler.pyramid_volume().rows();
+				pts_total_size += sampler.pyramid_points().rows();
+			}
 			else
 			{
 				if (mesh.is_volume())
@@ -861,6 +874,18 @@ namespace polyfem::io
 
 				tets.block(tet_index, 0, sampler.prism_volume().rows(), tets.cols()) = sampler.prism_volume().array() + pts_index;
 				tet_index += sampler.prism_volume().rows();
+
+				points.block(pts_index, 0, mapped.rows(), points.cols()) = mapped;
+				discr.block(pts_index, 0, mapped.rows(), 1).setConstant(disc_orders(i));
+				el_id.block(pts_index, 0, mapped.rows(), 1).setConstant(i);
+				pts_index += mapped.rows();
+			}
+			else if (mesh.is_pyramid(i))
+			{
+				bs.eval_geom_mapping(sampler.pyramid_points(), mapped);
+
+				tets.block(tet_index, 0, sampler.pyramid_volume().rows(), tets.cols()) = sampler.pyramid_volume().array() + pts_index;
+				tet_index += sampler.pyramid_volume().rows();
 
 				points.block(pts_index, 0, mapped.rows(), points.cols()) = mapped;
 				discr.block(pts_index, 0, mapped.rows(), 1).setConstant(disc_orders(i));
@@ -943,6 +968,10 @@ namespace polyfem::io
 					int max_order = std::max(disc_orders(i), disc_ordersq(i));
 					autogen::prism_nodes_3d(max_order, max_order, ref_pts);
 				}
+				else if (mesh.is_pyramid(i))
+				{
+					autogen::pyramid_nodes_3d(disc_orders(i), ref_pts);
+				}
 				else
 					continue;
 			}
@@ -985,6 +1014,10 @@ namespace polyfem::io
 				{
 					int max_order = std::max(disc_orders(i), disc_ordersq(i));
 					autogen::prism_nodes_3d(max_order, max_order, ref_pts);
+				}
+				else if (mesh.is_pyramid(i))
+				{
+					autogen::pyramid_nodes_3d(disc_orders(i), ref_pts);
 				}
 				else
 					continue;
@@ -1039,13 +1072,13 @@ namespace polyfem::io
 			else if (mesh.is_cube(i) && mesh.is_volume())
 			{
 				const int n_nodes = elements[i].vertices.size();
-				if (disc_orders(i) == 2)  // Lagrange hex, order=2
+				if (disc_orders(i) == 2) // Lagrange hex, order=2
 				{
 					std::swap(elements[i].vertices[12], elements[i].vertices[16]);
 					std::swap(elements[i].vertices[13], elements[i].vertices[17]);
 					std::swap(elements[i].vertices[14], elements[i].vertices[18]);
 					std::swap(elements[i].vertices[15], elements[i].vertices[19]);
-					std::swap(elements[i].vertices[18], elements[i].vertices[19]);  // a hack fix
+					std::swap(elements[i].vertices[18], elements[i].vertices[19]); // a hack fix
 				}
 				// if (disc_orders(i) == 3)  // Incomplete fix, need to fix order on the edge
 				// {
@@ -1093,25 +1126,27 @@ namespace polyfem::io
 		{
 			if (!mesh.is_volume())
 			{
-				if (elements[i].vertices.size()==1)
+				if (elements[i].vertices.size() == 1)
 					elements[i].ctype = CellType::Vertex;
-				else if (elements[i].vertices.size()==2)
-					elements[i].ctype = CellType::Line;		
+				else if (elements[i].vertices.size() == 2)
+					elements[i].ctype = CellType::Line;
 				else if (mesh.is_simplex(i))
 					elements[i].ctype = CellType::Triangle;
 				else if (mesh.is_cube(i))
-					elements[i].ctype = CellType::Quadrilateral;			
-				else 
+					elements[i].ctype = CellType::Quadrilateral;
+				else
 					elements[i].ctype = CellType::Polygon;
-	}
+			}
 			else
 			{
 				if (mesh.is_simplex(i))
-					elements[i].ctype = CellType::Tetrahedron;		
+					elements[i].ctype = CellType::Tetrahedron;
 				else if (mesh.is_cube(i))
-					elements[i].ctype = CellType::Hexahedron;		
+					elements[i].ctype = CellType::Hexahedron;
 				else if (mesh.is_prism(i))
 					elements[i].ctype = CellType::Wedge;
+				else if (mesh.is_pyramid(i))
+					elements[i].ctype = CellType::Pyramid;
 			}
 		}
 
@@ -1733,6 +1768,8 @@ namespace polyfem::io
 						local_pts = sampler.cube_points();
 					else if (mesh.is_prism(e))
 						local_pts = sampler.prism_points();
+					else if (mesh.is_pyramid(e))
+						local_pts = sampler.pyramid_points();
 					else
 					{
 						if (mesh.is_volume())
@@ -1751,6 +1788,8 @@ namespace polyfem::io
 							autogen::q_nodes_3d(disc_orders(e), local_pts);
 						else if (mesh.is_prism(e))
 							autogen::prism_nodes_3d(disc_orders(e), disc_ordersq(e), local_pts);
+						else if (mesh.is_pyramid(e))
+							autogen::pyramid_nodes_3d(disc_orders(e), local_pts);
 						else
 							continue;
 					}
@@ -2098,6 +2137,11 @@ namespace polyfem::io
 						const int tmp = boundary_vis_primitive_ids(i);
 						area = mesh.n_face_vertices(tmp) == 4 ? mesh.quad_area(tmp) : mesh.tri_area(tmp);
 					}
+					else if (mesh.is_pyramid(el_index))
+					{
+						const int tmp = boundary_vis_primitive_ids(i);
+						area = mesh.n_face_vertices(tmp) == 4 ? mesh.quad_area(tmp) : mesh.tri_area(tmp);
+					}
 				}
 				else
 					area = mesh.edge_length(boundary_vis_primitive_ids(i));
@@ -2359,7 +2403,7 @@ namespace polyfem::io
 			export_surface.substr(0, export_surface.length() - 4) + "_contact.vtu",
 			collision_mesh.rest_positions(),
 			problem_dim == 3 ? collision_mesh.faces() : collision_mesh.edges(),
-			problem_dim == 3 ? CellType::Triangle: CellType::Line);
+			problem_dim == 3 ? CellType::Triangle : CellType::Line);
 	}
 
 	void OutGeometryData::save_wire(
@@ -2404,6 +2448,12 @@ namespace polyfem::io
 				pts_total_size += sampler.prism_points().rows();
 				seg_total_size += sampler.prism_edges().rows();
 				faces_total_size += sampler.prism_faces().rows();
+			}
+			else if (mesh.is_pyramid(i))
+			{
+				pts_total_size += sampler.pyramid_points().rows();
+				seg_total_size += sampler.pyramid_edges().rows();
+				faces_total_size += sampler.pyramid_faces().rows();
 			}
 			else
 			{
@@ -2461,6 +2511,18 @@ namespace polyfem::io
 
 				faces.block(face_index, 0, sampler.prism_faces().rows(), 3) = sampler.prism_faces().array() + pts_index;
 				face_index += sampler.prism_faces().rows();
+
+				points.block(pts_index, 0, mapped.rows(), points.cols()) = mapped;
+				pts_index += mapped.rows();
+			}
+			else if (mesh.is_pyramid(i))
+			{
+				bs.eval_geom_mapping(sampler.pyramid_points(), mapped);
+				edges.block(seg_index, 0, sampler.pyramid_edges().rows(), edges.cols()) = sampler.pyramid_edges().array() + pts_index;
+				seg_index += sampler.pyramid_edges().rows();
+
+				faces.block(face_index, 0, sampler.pyramid_faces().rows(), 3) = sampler.pyramid_faces().array() + pts_index;
+				face_index += sampler.pyramid_faces().rows();
 
 				points.block(pts_index, 0, mapped.rows(), points.cols()) = mapped;
 				pts_index += mapped.rows();
@@ -3034,6 +3096,7 @@ namespace polyfem::io
 
 		simplex_count = 0;
 		prism_count = 0;
+		pyramid_count = 0;
 		regular_count = 0;
 		regular_boundary_count = 0;
 		simple_singular_count = 0;
@@ -3057,6 +3120,9 @@ namespace polyfem::io
 				break;
 			case ElementType::PRISM:
 				prism_count++;
+				break;
+			case ElementType::PYRAMID:
+				pyramid_count++;
 				break;
 			case ElementType::REGULAR_INTERIOR_CUBE:
 				regular_count++;
@@ -3093,6 +3159,7 @@ namespace polyfem::io
 
 		logger().info("simplex_count: \t{}", simplex_count);
 		logger().info("prism_count: \t{}", prism_count);
+		logger().info("pyramid_count: \t{}", pyramid_count);
 		logger().info("regular_count: \t{}", regular_count);
 		logger().info("regular_boundary_count: \t{}", regular_boundary_count);
 		logger().info("simple_singular_count: \t{}", simple_singular_count);
@@ -3180,6 +3247,7 @@ namespace polyfem::io
 
 		j["count_simplex"] = simplex_count;
 		j["count_prism"] = prism_count;
+		j["count_pyramid"] = pyramid_count;
 		j["count_regular"] = regular_count;
 		j["count_regular_boundary"] = regular_boundary_count;
 		j["count_simple_singular"] = simple_singular_count;

@@ -434,6 +434,53 @@ namespace polyfem
 			assert(false);
 			return idx;
 		}
+		Navigation3D::Index NCMesh3D::get_index_from_element_faceq(int hi, int v0, int v1, int v2, int v3) const
+		{
+			Navigation3D::Index idx;
+
+			idx.element = hi;
+			idx.vertex = v0;
+			idx.face = all_to_valid_face(find_face(valid_to_all_vertex(v0), valid_to_all_vertex(v1), valid_to_all_vertex(v2), valid_to_all_vertex(v3)));
+
+			for (int d = 0; d < n_face_vertices(idx.face); d++)
+				if (face_vertex(idx.face, d) == idx.vertex)
+					idx.face_corner = d;
+
+			int v0_ = v0, v1_ = v1;
+
+			// let v0_ < v1_
+			if (v0_ > v1_)
+				std::swap(v0_, v1_);
+
+			for (int i = 0; i < 5; i++)
+			{
+				const int fid = cell_face(idx.element, i);
+				if (fid != idx.face)
+					continue;
+
+				idx.element_patch = i;
+
+				for (int j = 0; j < 4; j++)
+				{
+					const int eid = face_edge(fid, j);
+					const int ev0 = edge_vertex(eid, 0);
+					const int ev1 = edge_vertex(eid, 1);
+
+					if ((ev0 == v0_ && ev1 == v1_) || (ev0 == v1_ && ev1 == v0_))
+					{
+						idx.edge = eid;
+
+						assert(switch_vertex(idx).vertex == v1);
+						assert(switch_vertex(switch_edge(idx)).vertex == v2);
+
+						return idx;
+					}
+				}
+			}
+
+			assert(false);
+			return idx;
+		}
 
 		std::vector<uint32_t> NCMesh3D::vertex_neighs(const int v_gid) const
 		{
@@ -911,6 +958,15 @@ namespace polyfem
 			std::sort(v.data(), v.data() + v.size());
 			auto search = faceMap.find(v);
 			if (search != faceMap.end())
+				return search->second;
+			else
+				return -1;
+		}
+		int NCMesh3D::find_face(Eigen::Vector4i v) const
+		{
+			std::sort(v.data(), v.data() + v.size());
+			auto search = faceMapq.find(v);
+			if (search != faceMapq.end())
 				return search->second;
 			else
 				return -1;

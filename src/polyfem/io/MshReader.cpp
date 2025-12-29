@@ -100,7 +100,7 @@ namespace polyfem::io
 			if (e.entity_dim != dim)
 				continue;
 			const int type = e.element_type;
-
+			// https://shipengcheng1230.github.io/GmshTools.jl/stable/element_types/
 			if (type == 2 || type == 9 || type == 21 || type == 23 || type == 25) // tri
 			{
 				assert(cells_cols == -1 || cells_cols == 3);
@@ -131,6 +131,12 @@ namespace polyfem::io
 				cells_cols = 6;
 				num_els += e.num_elements_in_block;
 			}
+			else if (type == 7) // pyramid
+			{
+				assert(cells_cols == -1 || cells_cols == 5);
+				cells_cols = 5;
+				num_els += e.num_elements_in_block;
+			}
 		}
 		assert(cells_cols > 0);
 
@@ -150,7 +156,7 @@ namespace polyfem::io
 			if (e.entity_dim != dim)
 				continue;
 			const int type = e.element_type;
-			if (type == 2 || type == 9 || type == 21 || type == 23 || type == 25 || type == 3 || type == 10 || type == 4 || type == 11 || type == 29 || type == 30 || type == 31 || type == 5 || type == 12 || type == 6)
+			if (type == 2 || type == 9 || type == 21 || type == 23 || type == 25 || type == 3 || type == 10 || type == 4 || type == 11 || type == 29 || type == 30 || type == 31 || type == 5 || type == 12 || type == 6 || type == 7)
 			{
 				const size_t n_nodes = mshio::nodes_per_element(type);
 				for (int i = 0; i < e.data.size(); i += (n_nodes + 1))
@@ -185,11 +191,9 @@ namespace polyfem::io
 		{
 			for (const auto &str : data.header.string_tags)
 				node_data_name.push_back(str);
-			
 			for (const auto &entry : data.entries)
 				for (const auto &d : entry.data)
 					node_data[i].push_back(d);
-			
 			i++;
 		}
 
