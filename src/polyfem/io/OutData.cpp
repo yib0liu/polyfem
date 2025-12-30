@@ -1787,7 +1787,10 @@ namespace polyfem::io
 						else if (mesh.is_cube(e))
 							autogen::q_nodes_3d(disc_orders(e), local_pts);
 						else if (mesh.is_prism(e))
-							autogen::prism_nodes_3d(disc_orders(e), disc_ordersq(e), local_pts);
+						{
+							const auto o = std::max(disc_orders(e), disc_ordersq(e));
+							autogen::prism_nodes_3d(o, o, local_pts);
+						}
 						else if (mesh.is_pyramid(e))
 							autogen::pyramid_nodes_3d(disc_orders(e) == 2 ? -1 : disc_orders(e), local_pts);
 
