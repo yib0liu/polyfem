@@ -657,6 +657,27 @@ namespace polyfem
 			disc_ordersq.setConstant(tmp_json2);
 		}
 
+		int max_order = 0;
+		for (int e = 0; e < mesh->n_elements(); ++e)
+		{
+			if (mesh->is_prism(e))
+			{
+				int p = disc_orders[e];
+				int q = disc_ordersq[e];
+				max_order = std::max(p, q);
+			}
+		}
+		logger().info("max order: {}", max_order);
+		for (int e = 0; e < mesh->n_elements(); ++e)
+		{
+			if (mesh->is_simplex(e))
+			{
+				disc_orders[e] = max_order;
+			}
+		}
+		logger().info("0: {} 1: {}", disc_orders[0], disc_orders[1]);
+		logger().info("min p: {} max p: {}", disc_orders.minCoeff(), disc_orders.maxCoeff());
+
 		igl::Timer timer;
 		timer.start();
 		if (args["space"]["use_p_ref"])
