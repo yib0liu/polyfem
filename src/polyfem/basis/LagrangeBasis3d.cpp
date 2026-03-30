@@ -3262,6 +3262,11 @@ int LagrangeBasis3d::build_bases(
 											}
 										}
 
+										if (mesh.n_face_vertices(index.face) == 4)
+											index = mesh.switch_face(index); // switch to tri face
+
+										assert(mesh.n_face_vertices(index.face) == 3);
+
 										assert(found);
 										assert(index.vertex == edge_index.vertex && index.edge == edge_index.edge);
 										assert(index.element != edge_index.element);
