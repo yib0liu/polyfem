@@ -2042,6 +2042,7 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 	{
 		const int n_edge_nodes = 2 * (p - 1) + 2 * (q - 1); // 4 edges
 		const int n_face_nodes = (p - 1) * (q - 1);
+		const int n_tri_face_nodes = p > 2 ? (p - 2) : 0;
 
 		// Extract requested interface
 		Eigen::VectorXi result(4 + n_edge_nodes + n_face_nodes);
@@ -2166,11 +2167,8 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 		}
 		else if (n_face_nodes != 0)
 		{
-			std::cout << "[DEBUG] High Order Mode: q=" << q << ", n_face_nodes=" << n_face_nodes << std::endl;
-
 			Eigen::MatrixXd nodes;
 			autogen::prism_nodes_3d(p, q, nodes);
-			std::cout << "[DEBUG] Generated nodes rows: " << nodes.rows() << ", cols: " << nodes.cols() << std::endl;
 
 			std::array<int, 4> idx; // local node id of the 4 face vertices
 			for (int lv = 0; lv < 4; ++lv)
@@ -2178,9 +2176,6 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 				idx[lv] = find_index(l2g.begin(), l2g.end(), index.vertex);
 				index = mesh.next_around_face(index);
 			}
-			std::cout << "[DEBUG] Final Face Corner Indices (local id): ["
-					  << idx[0] << ", " << idx[1] << ", "
-					  << idx[2] << ", " << idx[3] << "]" << std::endl;
 
 			Eigen::Matrix<double, 4, 3> pos(4, 3); // local (on ref) coordinates of the 4 face corner nodes
 			int cnt = 0;
@@ -2190,28 +2185,21 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 			}
 
 			const Eigen::RowVector3d bary = pos.colwise().mean();
-			std::cout << "[DEBUG] Target face barycenter: " << bary << std::endl;
 
 			const int offset = 6 + global_n_edges_nodes;
-			std::cout << "[DEBUG] Using offset: " << offset << " (Base 6 + EdgeNodes " << n_edge_nodes << ")" << std::endl;
 
 			bool found = false;
 			for (int lff = 0; lff < 3; ++lff)
 			{
-				std::cout << "[DEBUG] Testing candidate face " << lff << "..." << std::endl;
-
-				int start_row = offset + lff * n_face_nodes;
-				std::cout << "[DEBUG] Attempting block read from row: " << start_row << " to " << (start_row + n_face_nodes - 1) << std::endl;
+				int start_row = offset + lff * n_face_nodes + 2 * n_tri_face_nodes; // skip tri face nodes
 
 				Eigen::MatrixXd loc_nodes = nodes.block(start_row, 0, n_face_nodes, 3);
 				Eigen::RowVector3d node_bary = loc_nodes.colwise().mean();
 
 				double dist = (node_bary - bary).norm();
-				std::cout << "[DEBUG] Candidate " << lff << " barycenter: " << node_bary << " | Distance: " << dist << std::endl;
 
 				if (dist < 1e-10)
 				{
-					std::cout << "[DEBUG] >>> MATCH FOUND at face " << lff << " <<<" << std::endl;
 					int sum = 0;
 
 					for (int m = 0; m < 4; ++m) // m is on query index, the 4 corner nodes of the face
@@ -2220,7 +2208,7 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 						int min_n = -1;
 						double min_dis = 10000;
 
-						for (int n = 0; n < 4; ++n) // n is on ref index, the 4 face nodes of the candidate face
+						for (int n = 0; n < n_face_nodes; ++n)
 						{
 							double dis = (loc_nodes.row(n) - t).squaredNorm();
 							if (dis < min_dis)
@@ -2230,19 +2218,16 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 							}
 						}
 
-						std::cout << "[DEBUG] corner node (query index)" << m << "is matched to loc_node (ref) index " << min_n << std::endl;
-
 						assert(min_n >= 0);
-						assert(min_n < 4);
+						assert(min_n < n_face_nodes);
 
 						sum += min_n;
 
-						int final_idx = 6 + global_n_edges_nodes + min_n + lf * n_face_nodes;
-						std::cout << "[DEBUG] Writing result index: " << final_idx << std::endl;
+						int final_idx = 6 + global_n_edges_nodes + min_n + lf * n_face_nodes + 2 * n_tri_face_nodes;
 						result[ii++] = final_idx;
 					}
 
-					assert(sum == 6); // 0 + 1 + 2 + 3
+					assert(sum == n_face_nodes * (n_face_nodes - 1) / 2);
 
 					found = true;
 					assert(lff == lf);

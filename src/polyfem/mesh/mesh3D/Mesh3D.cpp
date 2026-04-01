@@ -205,14 +205,22 @@ namespace polyfem
 				{
 					if (n_face_vertices(switch_face(index).face) == 4)
 					{
-						const double b1 = i / (n_new_nodes + 1.0);
-						const double b2 = j / (n_new_nodesq + 1.0);
+						const double b1 = i / (n_new_nodesq + 1.0);
+						const double b2 = j / (n_new_nodes + 1.0);
+						assert(b1 <= 1);
+						assert(b2 <= 1);
+						assert(b1 >= 0);
+						assert(b2 >= 0);
 						return std::make_pair(v1 * (1 - b1) * (1 - b2) + v2 * b1 * (1 - b2) + v3 * b1 * b2 + v4 * (1 - b1) * b2, -1);
 					}
 					else
 					{
-						const double b1 = i / (n_new_nodesq + 1.0);
-						const double b2 = j / (n_new_nodes + 1.0);
+						const double b1 = i / (n_new_nodes + 1.0);
+						const double b2 = j / (n_new_nodesq + 1.0);
+						assert(b1 <= 1);
+						assert(b2 <= 1);
+						assert(b1 >= 0);
+						assert(b2 >= 0);
 						return std::make_pair(v1 * (1 - b1) * (1 - b2) + v2 * b1 * (1 - b2) + v3 * b1 * b2 + v4 * (1 - b1) * b2, -1);
 					}
 				}
