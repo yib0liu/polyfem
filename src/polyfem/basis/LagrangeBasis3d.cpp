@@ -670,7 +670,16 @@ namespace
 			// else
 			{
 				// todo prism, nodes are not necessarly a square
-				auto node_ids = nodes.node_ids_from_face(index, lf < 2 ? (p - 2) : ((q - 1) * (p - 1)));
+				auto node_ids = nodes.node_ids_from_face(index, lf < 2 ? (p - 2) : (p - 1), lf < 2 ? -1 : (q - 1));
+				if (lf < 2)
+				{
+					std::cout << node_ids.size() << " face nodes for triangular face " << lf << ", supposed to be " << n_face_nodest << std::endl;
+				}
+				else
+				{
+					std::cout << node_ids.size() << " face nodes for quad face " << lf << ", supposed to be " << n_face_nodesq << std::endl;
+				}
+				assert((lf < 2 && node_ids.size() == n_face_nodest) || (lf >= 2 && node_ids.size() == n_face_nodesq));
 				// assert(node_ids.size() == n_loc_f);
 				res.insert(res.end(), node_ids.begin(), node_ids.end());
 			}
@@ -1748,18 +1757,16 @@ Eigen::VectorXi LagrangeBasis3d::hex_face_local_nodes(const bool serendipity, co
 
 Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q, const Mesh3D &mesh, Navigation3D::Index index)
 {
-	const int c = index.element;
+	const int c = index.element; // c is global elem id
 	assert(mesh.is_prism(c));
 
 	// Local to global mapping of node indices
 	const auto l2g = prism_vertices_local_to_global(mesh, c);
-
 	const int global_n_edges_nodes = (p - 1) * 6 + (q - 1) * 3;
 
 	if (mesh.n_face_vertices(index.face) == 3)
 	{
 		const int nn = p > 2 ? (p - 2) : 0;
-		const int n_edge_nodes = (p - 1) * 6;
 		const int n_face_nodes = nn * (nn + 1) / 2;
 
 		// Extract requested interface
@@ -2060,17 +2067,18 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 	}
 	else
 	{
-		const int nn = q - 1;
-		const int n_edge_nodes = nn * 12;
-		const int n_face_nodes = nn * nn;
+		const int n_edge_nodes = 2 * (p - 1) + 2 * (q - 1); // 4 edges
+		const int n_face_nodes = (p - 1) * (q - 1);
 
 		// Extract requested interface
-		Eigen::VectorXi result(4 + nn * 4 + n_face_nodes);
+		Eigen::VectorXi result(4 + n_edge_nodes + n_face_nodes);
+		// v nodes
 		result[0] = find_index(l2g.begin(), l2g.end(), index.vertex);
 		result[1] = find_index(l2g.begin(), l2g.end(), mesh.next_around_face(index).vertex);
 		result[2] = find_index(l2g.begin(), l2g.end(), mesh.next_around_face(mesh.next_around_face(index)).vertex);
 		result[3] = find_index(l2g.begin(), l2g.end(), mesh.next_around_face(mesh.next_around_face(mesh.next_around_face(index))).vertex);
 
+		// e nodes
 		Eigen::Matrix<Navigation3D::Index, 9, 1> e;
 		Eigen::Matrix<int, 9, 2> ev;
 		ev.row(0) << l2g[0], l2g[1];
@@ -2089,7 +2097,7 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 
 		for (int le = 0; le < e.rows(); ++le)
 		{
-			const auto l_index = mesh.get_index_from_element_edge(c, ev(le, 0), ev(le, 1));
+			const auto l_index = mesh.get_index_from_element_edge(c, ev(le, 0), ev(le, 1)); // get random face for an edge
 			e[le] = l_index;
 		}
 
@@ -2118,22 +2126,47 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 			}
 			assert(le < 9);
 
-			if (!reverse)
-			{
+			// found le, know reverse
 
-				for (int i = 0; i < q - 1; ++i)
+			int cur_order = (le < 6) ? p : q;
+			int n_e_nodes = cur_order - 1;
+
+			if (le < 6)
+			{
+				if (!reverse)
 				{
-					result[ii++] = 6 + le * (q - 1) + i;
+
+					for (int i = 0; i < p - 1; ++i)
+					{
+						result[ii++] = 6 + le * (p - 1) + i;
+					}
+				}
+				else
+				{
+					for (int i = 0; i < p - 1; ++i)
+					{
+						result[ii++] = 6 + (le + 1) * (p - 1) - i - 1;
+					}
 				}
 			}
 			else
 			{
-				for (int i = 0; i < q - 1; ++i)
+				if (!reverse)
 				{
-					result[ii++] = 6 + (le + 1) * (q - 1) - i - 1;
+
+					for (int i = 0; i < q - 1; ++i)
+					{
+						result[ii++] = 6 + 6 * (p - 1) + (le - 6) * (q - 1) + i;
+					}
+				}
+				else
+				{
+					for (int i = 0; i < q - 1; ++i)
+					{
+						result[ii++] = 6 + 6 * (p - 1) + (le - 5) * (q - 1) - i - 1;
+					}
 				}
 			}
-
 			tmp = mesh.next_around_face(tmp);
 		}
 
@@ -2155,22 +2188,28 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 		assert(lf < fv.rows());
 
 		if (n_face_nodes == 1)
+		{
 			result[ii++] = 6 + global_n_edges_nodes + lf;
+		}
 		else if (n_face_nodes != 0)
 		{
-			Eigen::MatrixXd nodes;
-			autogen::q_nodes_3d(q, nodes);
-			// auto pos = LagrangeBasis3d::linear_tet_face_local_nodes_coordinates(mesh, index);
-			// Local to global mapping of node indices
+			std::cout << "[DEBUG] High Order Mode: q=" << q << ", n_face_nodes=" << n_face_nodes << std::endl;
 
-			// Extract requested interface
-			std::array<int, 4> idx;
+			Eigen::MatrixXd nodes;
+			autogen::prism_nodes_3d(p, q, nodes);
+			std::cout << "[DEBUG] Generated nodes rows: " << nodes.rows() << ", cols: " << nodes.cols() << std::endl;
+
+			std::array<int, 4> idx; // local node id of the 4 face vertices
 			for (int lv = 0; lv < 4; ++lv)
 			{
 				idx[lv] = find_index(l2g.begin(), l2g.end(), index.vertex);
 				index = mesh.next_around_face(index);
 			}
-			Eigen::Matrix<double, 4, 3> pos(4, 3);
+			std::cout << "[DEBUG] Final Face Corner Indices (local id): ["
+					  << idx[0] << ", " << idx[1] << ", "
+					  << idx[2] << ", " << idx[3] << "]" << std::endl;
+
+			Eigen::Matrix<double, 4, 3> pos(4, 3); // local (on ref) coordinates of the 4 face corner nodes
 			int cnt = 0;
 			for (int i : idx)
 			{
@@ -2178,24 +2217,37 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 			}
 
 			const Eigen::RowVector3d bary = pos.colwise().mean();
+			std::cout << "[DEBUG] Target face barycenter: " << bary << std::endl;
 
-			const int offset = 8 + n_edge_nodes;
+			const int offset = 6 + global_n_edges_nodes;
+			std::cout << "[DEBUG] Using offset: " << offset << " (Base 6 + EdgeNodes " << n_edge_nodes << ")" << std::endl;
+
 			bool found = false;
-			for (int lff = 0; lff < 6; ++lff)
+			for (int lff = 0; lff < 3; ++lff)
 			{
-				Eigen::Matrix<double, 4, 3> loc_nodes = nodes.block<4, 3>(offset + lff * n_face_nodes, 0);
+				std::cout << "[DEBUG] Testing candidate face " << lff << "..." << std::endl;
+
+				int start_row = offset + lff * n_face_nodes;
+				std::cout << "[DEBUG] Attempting block read from row: " << start_row << " to " << (start_row + n_face_nodes - 1) << std::endl;
+
+				Eigen::MatrixXd loc_nodes = nodes.block(start_row, 0, n_face_nodes, 3);
 				Eigen::RowVector3d node_bary = loc_nodes.colwise().mean();
 
-				if ((node_bary - bary).norm() < 1e-10)
+				double dist = (node_bary - bary).norm();
+				std::cout << "[DEBUG] Candidate " << lff << " barycenter: " << node_bary << " | Distance: " << dist << std::endl;
+
+				if (dist < 1e-10)
 				{
+					std::cout << "[DEBUG] >>> MATCH FOUND at face " << lff << " <<<" << std::endl;
 					int sum = 0;
-					for (int m = 0; m < 4; ++m)
+
+					for (int m = 0; m < 4; ++m) // m is on query index, the 4 corner nodes of the face
 					{
-						auto t = pos.row(m);
+						auto t = pos.row(m); // ??? should be face nodes?
 						int min_n = -1;
 						double min_dis = 10000;
 
-						for (int n = 0; n < 4; ++n)
+						for (int n = 0; n < 4; ++n) // n is on ref index, the 4 face nodes of the candidate face
 						{
 							double dis = (loc_nodes.row(n) - t).squaredNorm();
 							if (dis < min_dis)
@@ -2205,12 +2257,16 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 							}
 						}
 
+						std::cout << "[DEBUG] corner node (query index)" << m << "is matched to loc_node (ref) index " << min_n << std::endl;
+
 						assert(min_n >= 0);
 						assert(min_n < 4);
 
 						sum += min_n;
 
-						result[ii++] = 8 + n_edge_nodes + min_n + lf * n_face_nodes;
+						int final_idx = 6 + global_n_edges_nodes + min_n + lf * n_face_nodes;
+						std::cout << "[DEBUG] Writing result index: " << final_idx << std::endl;
+						result[ii++] = final_idx;
 					}
 
 					assert(sum == 6); // 0 + 1 + 2 + 3
@@ -3142,7 +3198,9 @@ int LagrangeBasis3d::build_bases(
 							const int global_index = element_nodes_id[e][j];
 
 							if (global_index >= 0)
+							{
 								b.bases[j].init(discr_order, global_index, j, nodes.node_position(global_index));
+							}
 							else
 							{
 								const int lnn = max_p > 2 ? (discr_order - 2) : 0;
@@ -3266,7 +3324,6 @@ int LagrangeBasis3d::build_bases(
 											index = mesh.switch_face(index); // switch to tri face
 
 										assert(mesh.n_face_vertices(index.face) == 3);
-
 										assert(found);
 										assert(index.vertex == edge_index.vertex && index.edge == edge_index.edge);
 										assert(index.element != edge_index.element);
