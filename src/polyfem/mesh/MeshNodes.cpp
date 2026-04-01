@@ -399,30 +399,58 @@ namespace polyfem::mesh
 
 			if (mesh3d->is_prism(index.element))
 			{
-				const bool is_on_tri_face = mesh3d->n_face_vertices(mesh3d->switch_face(index).face) == 3;
-
-				for (int i = 1; i <= n_new_nodes; ++i)
+				if (is_tri) // tri face was working with the old scheme
 				{
-					for (int j = 1; j <= n_new_nodesq; ++j)
+					for (int i = 1; i <= n_new_nodes; ++i)
 					{
-						const int ii = is_on_tri_face ? i : j;
-						const int jj = is_on_tri_face ? j : i;
+						const int end = n_new_nodes - i + 1;
+						for (int j = 1; j <= end; ++j)
+						{
+							const int primitive_id = start + loc_index;
+							const auto [node, node_id] = mesh3d->face_node(index, n_new_nodes, i, j);
 
-						const int primitive_id = start + loc_index;
-						const auto [node, node_id] = mesh3d->face_node(index, n_new_nodes, n_new_nodesq, ii, jj);
+							primitive_to_node_[primitive_id] = n_nodes();
 
-						primitive_to_node_[primitive_id] = n_nodes();
+							in_ordered_vertices_.push_back(node_id);
+							node_to_primitive_.push_back(primitive_id);
+							node_to_primitive_gid_.push_back(index.face);
 
-						in_ordered_vertices_.push_back(node_id);
-						node_to_primitive_.push_back(primitive_id);
-						node_to_primitive_gid_.push_back(index.face);
+							nodes_.row(primitive_id) = node;
 
-						nodes_.row(primitive_id) = node;
+							res.push_back(primitive_to_node_[primitive_id]);
+							assert(in_ordered_vertices_.size() == n_nodes());
 
-						res.push_back(primitive_to_node_[primitive_id]);
-						assert(in_ordered_vertices_.size() == n_nodes());
+							++loc_index;
+						}
+					}
+				}
+				else
+				{
+					const bool is_on_tri_face = mesh3d->n_face_vertices(mesh3d->switch_face(index).face) == 3; // on quad face, next to tri face
 
-						++loc_index;
+					for (int i = 1; i <= n_new_nodes; ++i)
+					{
+						for (int j = 1; j <= n_new_nodesq; ++j)
+						{
+							const int ii = is_on_tri_face ? i : j;
+							const int jj = is_on_tri_face ? j : i;
+
+							const int primitive_id = start + loc_index;
+							const auto [node, node_id] = mesh3d->face_node(index, n_new_nodes, n_new_nodesq, ii, jj);
+
+							primitive_to_node_[primitive_id] = n_nodes();
+
+							in_ordered_vertices_.push_back(node_id);
+							node_to_primitive_.push_back(primitive_id);
+							node_to_primitive_gid_.push_back(index.face);
+
+							nodes_.row(primitive_id) = node;
+
+							res.push_back(primitive_to_node_[primitive_id]);
+							assert(in_ordered_vertices_.size() == n_nodes());
+
+							++loc_index;
+						}
 					}
 				}
 			}
