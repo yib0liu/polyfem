@@ -649,6 +649,10 @@ namespace
 			{
 				auto node_ids = nodes.node_ids_from_edge(index, (le < 6 ? p : q) - 1);
 				res.insert(res.end(), node_ids.begin(), node_ids.end());
+				std::cout << "le: " << le << " index: " << index.edge << " node_ids: ";
+				for (int i = 0; i < node_ids.size(); ++i)
+					std::cout << node_ids[i] << " ";
+				std::cout << std::endl;
 			}
 		}
 		assert(res.size() == size_t(6 + n_edge_nodes));
@@ -699,6 +703,9 @@ namespace
 		}
 
 		assert(res.size() == size_t(6 + n_edge_nodes + n_face_nodes + n_cell_nodes));
+		for (int i = 0; i < res.size(); ++i)
+			std::cout << "res " << i << ": " << res[i] << " ";
+		std::cout << std::endl;
 	}
 
 	void pyramid_local_to_global(const int p, const Mesh3D &mesh, int c, const Eigen::VectorXi &discr_order, std::vector<int> &res, MeshNodes &nodes)
@@ -1030,6 +1037,7 @@ namespace
 				}
 				else if (mesh.is_prism(c2))
 				{
+					std::cout << "prism_face_local_nodes called at 1" << std::endl;
 					indices = LagrangeBasis3d::prism_face_local_nodes(discr_order, discr_orderq, mesh, index2);
 				}
 				else if (mesh.is_pyramid(c2))
@@ -1757,18 +1765,29 @@ Eigen::VectorXi LagrangeBasis3d::hex_face_local_nodes(const bool serendipity, co
 
 Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q, const Mesh3D &mesh, Navigation3D::Index index)
 {
+	std::cout << "prism_face_local_nodes called" << std::endl;
+	std::cout << "query index "
+			  << "vertex: " << index.vertex << " edge: " << index.edge << " face: " << index.face << " face corner: " << index.face_corner << " element: " << index.element << " element_patch: " << index.element_patch << std::endl;
+	std::cout << "query index vertex, next vertex, next next vertex coord: " << mesh.point(index.vertex) << ", " << mesh.point(mesh.next_around_face(index).vertex) << ", " << mesh.point(mesh.next_around_face(mesh.next_around_face(index)).vertex) << std::endl;
+
 	const int c = index.element; // c is global elem id
 	assert(mesh.is_prism(c));
 
 	// Local to global mapping of node indices
 	const auto l2g = prism_vertices_local_to_global(mesh, c);
+	for (int i = 0; i < l2g.size(); ++i)
+	{
+		std::cout << "l2g ref local vertex id: " << i << ", global vertex id: " << l2g[i] << std::endl;
+	}
 	const int global_n_edges_nodes = (p - 1) * 6 + (q - 1) * 3;
 
 	if (mesh.n_face_vertices(index.face) == 3)
 	{
+		std::cout << "tri face" << std::endl;
 		const int nn = p > 2 ? (p - 2) : 0;
 		const int n_face_nodes = nn * (nn + 1) / 2;
 
+		std::cout << "set result len: " << 3 + (p - 1) * 3 + n_face_nodes << std::endl;
 		// Extract requested interface
 		Eigen::VectorXi result(3 + (p - 1) * 3 + n_face_nodes);
 		result[0] = find_index(l2g.begin(), l2g.end(), index.vertex);
@@ -2063,6 +2082,10 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 		// }
 
 		assert(ii == result.size());
+		for (int i = 0; i < result.size(); ++i)
+		{
+			std::cout << "result[" << i << "] = " << result[i] << std::endl;
+		}
 		return result;
 	}
 	else
@@ -2072,6 +2095,7 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 
 		// Extract requested interface
 		Eigen::VectorXi result(4 + n_edge_nodes + n_face_nodes);
+		std::cout << "set result len: " << 4 + n_edge_nodes + n_face_nodes << std::endl;
 		// v nodes
 		result[0] = find_index(l2g.begin(), l2g.end(), index.vertex);
 		result[1] = find_index(l2g.begin(), l2g.end(), mesh.next_around_face(index).vertex);
@@ -2177,6 +2201,9 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 		fv.row(1) << l2g[1], l2g[4], l2g[5], l2g[2];
 		fv.row(2) << l2g[2], l2g[5], l2g[3], l2g[0];
 
+		std::cout << "[DEBUG] --- Face Matching Start ---" << std::endl;
+		std::cout << "[DEBUG] Current Face Index (index.face): " << index.face << std::endl;
+
 		long lf = 0;
 		for (; lf < fv.rows(); ++lf)
 		{
@@ -2185,10 +2212,16 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 				break;
 		}
 
+		std::cout << "[DEBUG] Matched local face row (lf): " << lf << std::endl;
 		assert(lf < fv.rows());
 
-		if (n_face_nodes == 1)
+		if (n_face_nodes == 0)
 		{
+			std::cout << "[DEBUG] No face nodes for this order (n_face_nodes=0)." << std::endl;
+		}
+		else if (n_face_nodes == 1)
+		{
+			std::cout << "[DEBUG] Order is low (n_face_nodes=1), straightforward mapping." << std::endl;
 			result[ii++] = 6 + global_n_edges_nodes + lf;
 		}
 		else if (n_face_nodes != 0)
@@ -2279,10 +2312,18 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 					break;
 			}
 
+			if (!found)
+			{
+				std::cerr << "[ERROR] Failed to match face barycenter after 3 attempts!" << std::endl;
+			}
 			assert(found);
 		}
 
 		assert(ii == result.size());
+		for (int i = 0; i < result.size(); ++i)
+		{
+			std::cout << "result[" << i << "] = " << result[i] << std::endl;
+		}
 		return result;
 	}
 }
@@ -2634,6 +2675,7 @@ int LagrangeBasis3d::build_bases(
 						break;
 				}
 				assert(index.face == primitive_id);
+				std::cout << "prism_face_local_nodes called at 2, p=" << discr_order << ", q=" << discr_orderq << std::endl;
 				return prism_face_local_nodes(discr_order, discr_orderq, mesh3d, index);
 			});
 
@@ -3176,6 +3218,25 @@ int LagrangeBasis3d::build_bases(
 		{
 			for (int pp = 2; pp <= autogen::MAX_P_BASES; ++pp)
 			{
+				logger().info("conf mesh with pp={}", pp);
+				for (int v = 0; v < mesh.n_vertices(); ++v)
+				{
+					logger().info("global v id: {}, pos: {}", v, mesh.point(v));
+				}
+				for (int e = 0; e < mesh.n_cells(); ++e)
+				{
+					logger().info("e:{}, element_vertices (global ids): {}", e, mesh.element_vertices(e));
+					logger().info("node ids");
+
+					for (int j = 0; j < element_nodes_id[e].size(); ++j)
+					{
+						const int global_index = element_nodes_id[e][j];
+						logger().info("j:{}, global:{}", j, global_index);
+					}
+				}
+
+				logger().info("\n interface elements");
+
 				for (int e : interface_elements)
 				{
 					ElementBases &b = bases[e];
@@ -3186,6 +3247,8 @@ int LagrangeBasis3d::build_bases(
 					if (discr_order != pp)
 						continue;
 
+					logger().info("e:{}", e);
+
 					if (mesh.is_cube(e) || mesh.is_prism(e))
 					{
 						// TODO
@@ -3193,6 +3256,7 @@ int LagrangeBasis3d::build_bases(
 					}
 					else if (mesh.is_simplex(e))
 					{
+						logger().info("ncb interface elem is simplex");
 						for (int j = 0; j < n_el_bases; ++j)
 						{
 							const int global_index = element_nodes_id[e][j];
@@ -3250,6 +3314,10 @@ int LagrangeBasis3d::build_bases(
 
 									// const auto edge_index = find_edge(mesh, e, ev(le, 0), ev(le, 1));
 									const auto edge_index = mesh.get_index_from_element_edge(e, ev(le, 0), ev(le, 1));
+									std::cout << "edge index "
+											  << "vertex: " << edge_index.vertex << " edge: " << edge_index.edge << " face: " << edge_index.face << " face corner: " << edge_index.face_corner << " element: " << edge_index.element << " element_patch: " << edge_index.element_patch << std::endl;
+									std::cout << "edge index vertex, next vertex, next next vertex coord: " << mesh.point(edge_index.vertex) << ", " << mesh.point(mesh.next_around_face(edge_index).vertex) << ", " << mesh.point(mesh.next_around_face(mesh.next_around_face(edge_index)).vertex) << std::endl;
+
 									auto neighs = mesh.edge_neighs(edge_index.edge);
 									int min_p = discr_order;
 									int min_cell = edge_index.element;
@@ -3348,6 +3416,11 @@ int LagrangeBasis3d::build_bases(
 									index = mesh.switch_element(mesh.get_index_from_element_face(e, fv(lf, 0), fv(lf, 1), fv(lf, 2)));
 								}
 
+								std::cout << "index "
+										  << "vertex: " << index.vertex << " edge: " << index.edge << " face: " << index.face << " face corner: " << index.face_corner << " element: " << index.element << " element_patch: " << index.element_patch << std::endl;
+								std::cout << "index vertex, next vertex, next next vertex coord: " << mesh.point(index.vertex) << ", " << mesh.point(mesh.next_around_face(index).vertex) << ", " << mesh.point(mesh.next_around_face(mesh.next_around_face(index)).vertex) << std::endl;
+								// std::cout << "index vertex, next vertex, next next vertex coord: " << mesh.point(index.vertex) << " " << mesh.point(mesh.switch_vertex(index).vertex) << mesh.point(mesh.switch_vertex(mesh.switch_edge(mesh.switch_vertex(index))).vertex) << std::endl;
+
 								const auto other_cell = index.element;
 								assert(other_cell >= 0);
 
@@ -3364,6 +3437,7 @@ int LagrangeBasis3d::build_bases(
 								else if (mesh.is_prism(other_cell))
 								{
 									assert(discr_order > discr_ordersp(other_cell));
+									std::cout << "prism_face_local_nodes called at 3" << std::endl;
 									indices = prism_face_local_nodes(discr_order, 1, mesh, index);
 									autogen::prism_nodes_3d(discr_order, 1, lnodes);
 								}

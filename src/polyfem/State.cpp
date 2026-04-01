@@ -34,6 +34,7 @@
 
 #include <polyfem/autogen/auto_p_bases.hpp>
 #include <polyfem/autogen/auto_q_bases.hpp>
+#include <polyfem/autogen/prism_bases.hpp>
 
 #include <polyfem/quadrature/HexQuadrature.hpp>
 #include <polyfem/quadrature/QuadQuadrature.hpp>
@@ -658,16 +659,16 @@ namespace polyfem
 		}
 
 		int max_order = 0;
+		int p, q;
 		for (int e = 0; e < mesh->n_elements(); ++e)
 		{
 			if (mesh->is_prism(e))
 			{
-				int p = disc_orders[e];
-				int q = disc_ordersq[e];
+				p = disc_orders[e];
+				q = disc_ordersq[e];
 				max_order = std::max(p, q);
 			}
 		}
-		logger().info("max order: {}", max_order);
 		for (int e = 0; e < mesh->n_elements(); ++e)
 		{
 			if (mesh->is_simplex(e))
@@ -675,8 +676,15 @@ namespace polyfem
 				disc_orders[e] = max_order;
 			}
 		}
-		logger().info("0: {} 1: {}", disc_orders[0], disc_orders[1]);
 		logger().info("min p: {} max p: {}", disc_orders.minCoeff(), disc_orders.maxCoeff());
+
+		Eigen::MatrixXd nodes;
+		autogen::prism_nodes_3d(p, q, nodes);
+		std::cout << "Ref Prism nodes (Total: " << nodes.rows() << "):" << std::endl;
+		for (int i = 0; i < nodes.rows(); ++i)
+		{
+			std::cout << "Node " << i << ": " << nodes.row(i) << std::endl;
+		}
 
 		igl::Timer timer;
 		timer.start();
@@ -731,8 +739,11 @@ namespace polyfem
 			else
 			{
 				if (!iso_parametric())
+				{
+					logger().debug("Building bases called at 1");
 					n_geom_bases = basis::LagrangeBasis3d::build_bases(tmp_mesh, assembler->name(), quadrature_order, mass_quadrature_order, geom_disc_orders, geom_disc_ordersq, false, false, has_polys, !use_continuous_gbasis, use_corner_quadrature, geom_bases_, local_boundary, poly_edge_to_data_geom, geom_mesh_nodes);
-
+				}
+				logger().debug("Building bases called at 2");
 				n_bases = basis::LagrangeBasis3d::build_bases(tmp_mesh, assembler->name(), quadrature_order, mass_quadrature_order, disc_orders, disc_ordersq, args["space"]["basis_type"] == "Bernstein", args["space"]["basis_type"] == "Serendipity", has_polys, false, use_corner_quadrature, bases, local_boundary, poly_edge_to_data, mesh_nodes);
 			}
 
@@ -742,7 +753,7 @@ namespace polyfem
 				const int order = args["space"]["pressure_discr_order"];
 				// todo prism
 				const int orderq = order;
-
+				logger().debug("Building bases called at 3");
 				n_pressure_bases = basis::LagrangeBasis3d::build_bases(tmp_mesh, assembler->name(), quadrature_order, mass_quadrature_order, order, orderq, args["space"]["basis_type"] == "Bernstein", false, has_polys, false, use_corner_quadrature, pressure_bases, local_boundary, poly_edge_to_data_geom, pressure_mesh_nodes);
 			}
 		}
@@ -844,11 +855,25 @@ namespace polyfem
 			logger().debug("Done (took {}s)", timer2.getElapsedTime());
 		}
 
-		logger().info("Building collision mesh...");
-		build_collision_mesh();
-		if (periodic_bc && args["contact"]["periodic"])
-			build_periodic_collision_mesh();
-		logger().info("Done!");
+		for (int e = 0; e < mesh->n_edges(); ++e)
+		{
+			logger().debug("edge {}, v1: {}, v2: {}", e, mesh->edge_vertex(e, 0), mesh->edge_vertex(e, 1));
+		}
+
+		for (int f = 0; f < mesh->n_faces(); ++f)
+		{
+			logger().debug("face {}", f);
+			for (int i = 0; i < mesh->n_face_vertices(f); ++i)
+			{
+				logger().debug("v{}: {}", i, mesh->face_vertex(f, i));
+			}
+		}
+
+		// logger().info("Building collision mesh...");
+		// build_collision_mesh();
+		// if (periodic_bc && args["contact"]["periodic"])
+		// 	build_periodic_collision_mesh();
+		// logger().info("Done!");
 
 		const int prev_b_size = local_boundary.size();
 		problem->setup_bc(*mesh, n_bases - obstacle.n_vertices(),
@@ -979,31 +1004,31 @@ namespace polyfem
 			starting_max_edge_length = stats.mesh_size;
 		}
 
-		if (is_contact_enabled())
-		{
-			min_boundary_edge_length = std::numeric_limits<double>::max();
-			for (const auto &edge : collision_mesh.edges().rowwise())
-			{
-				const VectorNd v0 = collision_mesh.rest_positions().row(edge(0));
-				const VectorNd v1 = collision_mesh.rest_positions().row(edge(1));
-				min_boundary_edge_length = std::min(min_boundary_edge_length, (v1 - v0).norm());
-			}
+		// if (is_contact_enabled())
+		// {
+		// 	min_boundary_edge_length = std::numeric_limits<double>::max();
+		// 	for (const auto &edge : collision_mesh.edges().rowwise())
+		// 	{
+		// 		const VectorNd v0 = collision_mesh.rest_positions().row(edge(0));
+		// 		const VectorNd v1 = collision_mesh.rest_positions().row(edge(1));
+		// 		min_boundary_edge_length = std::min(min_boundary_edge_length, (v1 - v0).norm());
+		// 	}
 
-			double dhat = Units::convert(args["contact"]["dhat"], units.length());
-			args["contact"]["epsv"] = Units::convert(args["contact"]["epsv"], units.velocity());
-			args["contact"]["dhat"] = dhat;
+		// 	double dhat = Units::convert(args["contact"]["dhat"], units.length());
+		// 	args["contact"]["epsv"] = Units::convert(args["contact"]["epsv"], units.velocity());
+		// 	args["contact"]["dhat"] = dhat;
 
-			if (!has_dhat && dhat > min_boundary_edge_length)
-			{
-				args["contact"]["dhat"] = double(args["contact"]["dhat_percentage"]) * min_boundary_edge_length;
-				logger().info("dhat set to {}", double(args["contact"]["dhat"]));
-			}
-			else
-			{
-				if (dhat > min_boundary_edge_length)
-					logger().warn("dhat larger than min boundary edge, {} > {}", dhat, min_boundary_edge_length);
-			}
-		}
+		// 	if (!has_dhat && dhat > min_boundary_edge_length)
+		// 	{
+		// 		args["contact"]["dhat"] = double(args["contact"]["dhat_percentage"]) * min_boundary_edge_length;
+		// 		logger().info("dhat set to {}", double(args["contact"]["dhat"]));
+		// 	}
+		// 	else
+		// 	{
+		// 		if (dhat > min_boundary_edge_length)
+		// 			logger().warn("dhat larger than min boundary edge, {} > {}", dhat, min_boundary_edge_length);
+		// 	}
+		// }
 
 		logger().info("n_bases {}", n_bases);
 
