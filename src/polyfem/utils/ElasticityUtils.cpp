@@ -223,6 +223,18 @@ namespace polyfem
 			hessian = auto_diff_energy.getHessian();
 			break;
 		}
+		case 27:
+		case 36:
+		case 45:
+		case 54:
+		case 63:
+		{
+			// p=1 prism with q=2..6 (9..21 nodes × 3D): heap-allocate to avoid
+			// stack overflow in TBB worker threads (~1.4 MB with SMALL_N=80)
+			auto auto_diff_energy = funn(data);
+			hessian = auto_diff_energy.getHessian();
+			break;
+		}
 		case 30:
 		{
 			auto auto_diff_energy = fun30(data);

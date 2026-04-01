@@ -2060,12 +2060,21 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 	}
 	else
 	{
-		const int nn = q - 1;
-		const int n_edge_nodes = nn * 12;
-		const int n_face_nodes = nn * nn;
+		// Prism edges split by type:
+		//   ev rows 0..5  (le < 6): triangle edges (bottom 0-1-2, top 3-4-5), p-1 mid-nodes each
+		//   ev rows 6..8  (le >= 6): vertical edges 0-3, 1-4, 2-5,             q-1 mid-nodes each
+		// Node layout inside element:
+		//   [0..5]                       : 6 corner vertices
+		//   [6 .. 6+6*(p-1)-1]           : triangle edge nodes (p-1 per edge × 6 edges)
+		//   [6+6*(p-1) .. 6+global_n_edges_nodes-1] : vertical edge nodes (q-1 per edge × 3 edges)
+		const int n_tri_edge = p - 1;  // mid-nodes per triangle edge
+		const int n_vert_edge = q - 1; // mid-nodes per vertical edge
+		// A lateral quad face has 2 triangle edges and 2 vertical edges, plus (p-1)*(q-1) interior nodes
+		const int n_face_nodes = n_tri_edge * n_vert_edge;
+		const int n_edge_nodes = 6 * n_tri_edge + 3 * n_vert_edge; // = global_n_edges_nodes
 
 		// Extract requested interface
-		Eigen::VectorXi result(4 + nn * 4 + n_face_nodes);
+		Eigen::VectorXi result(4 + 2 * n_tri_edge + 2 * n_vert_edge + n_face_nodes);
 		result[0] = find_index(l2g.begin(), l2g.end(), index.vertex);
 		result[1] = find_index(l2g.begin(), l2g.end(), mesh.next_around_face(index).vertex);
 		result[2] = find_index(l2g.begin(), l2g.end(), mesh.next_around_face(mesh.next_around_face(index)).vertex);
@@ -2118,19 +2127,25 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 			}
 			assert(le < 9);
 
+			// Triangle edges (le < 6) use p-1 mid-nodes; vertical edges (le >= 6) use q-1.
+			const bool is_vert = (le >= 6);
+			const int n_edge = is_vert ? n_vert_edge : n_tri_edge;
+			// Base index in the element's node array for this edge's mid-nodes
+			const int edge_base = is_vert ? (6 + 6 * n_tri_edge + (le - 6) * n_vert_edge)
+			                              : (6 + le * n_tri_edge);
+
 			if (!reverse)
 			{
-
-				for (int i = 0; i < q - 1; ++i)
+				for (int i = 0; i < n_edge; ++i)
 				{
-					result[ii++] = 6 + le * (q - 1) + i;
+					result[ii++] = edge_base + i;
 				}
 			}
 			else
 			{
-				for (int i = 0; i < q - 1; ++i)
+				for (int i = 0; i < n_edge; ++i)
 				{
-					result[ii++] = 6 + (le + 1) * (q - 1) - i - 1;
+					result[ii++] = edge_base + n_edge - i - 1;
 				}
 			}
 
@@ -2154,76 +2169,20 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 
 		assert(lf < fv.rows());
 
-		if (n_face_nodes == 1)
-			result[ii++] = 6 + global_n_edges_nodes + lf;
-		else if (n_face_nodes != 0)
+		// Quad face interior nodes in the element node array are laid out as:
+		//   [0..5]                                     : 6 corner vertices
+		//   [6 .. 6+n_edge_nodes-1]                    : edge mid-nodes
+		//   [6+n_edge_nodes .. 6+n_edge_nodes+2*npf-1] : triangular-face interior nodes (2 tri faces)
+		//   [6+n_edge_nodes+2*npf ..]                  : lateral quad-face interior nodes (3 faces × n_face_nodes)
+		const int npf = std::max(0, (p - 1) * (p - 2) / 2);
+		const int quad_face_offset = 6 + n_edge_nodes + 2 * npf;
+
+		if (n_face_nodes != 0)
 		{
-			Eigen::MatrixXd nodes;
-			autogen::q_nodes_3d(q, nodes);
-			// auto pos = LagrangeBasis3d::linear_tet_face_local_nodes_coordinates(mesh, index);
-			// Local to global mapping of node indices
-
-			// Extract requested interface
-			std::array<int, 4> idx;
-			for (int lv = 0; lv < 4; ++lv)
-			{
-				idx[lv] = find_index(l2g.begin(), l2g.end(), index.vertex);
-				index = mesh.next_around_face(index);
-			}
-			Eigen::Matrix<double, 4, 3> pos(4, 3);
-			int cnt = 0;
-			for (int i : idx)
-			{
-				pos.row(cnt++) = nodes.row(i);
-			}
-
-			const Eigen::RowVector3d bary = pos.colwise().mean();
-
-			const int offset = 8 + n_edge_nodes;
-			bool found = false;
-			for (int lff = 0; lff < 6; ++lff)
-			{
-				Eigen::Matrix<double, 4, 3> loc_nodes = nodes.block<4, 3>(offset + lff * n_face_nodes, 0);
-				Eigen::RowVector3d node_bary = loc_nodes.colwise().mean();
-
-				if ((node_bary - bary).norm() < 1e-10)
-				{
-					int sum = 0;
-					for (int m = 0; m < 4; ++m)
-					{
-						auto t = pos.row(m);
-						int min_n = -1;
-						double min_dis = 10000;
-
-						for (int n = 0; n < 4; ++n)
-						{
-							double dis = (loc_nodes.row(n) - t).squaredNorm();
-							if (dis < min_dis)
-							{
-								min_dis = dis;
-								min_n = n;
-							}
-						}
-
-						assert(min_n >= 0);
-						assert(min_n < 4);
-
-						sum += min_n;
-
-						result[ii++] = 8 + n_edge_nodes + min_n + lf * n_face_nodes;
-					}
-
-					assert(sum == 6); // 0 + 1 + 2 + 3
-
-					found = true;
-					assert(lff == lf);
-				}
-
-				if (found)
-					break;
-			}
-
-			assert(found);
+			// lf already identifies which lateral quad face (0, 1, or 2).
+			// Interior nodes for face lf are contiguous in canonical element order.
+			for (int m = 0; m < n_face_nodes; ++m)
+				result[ii++] = quad_face_offset + lf * n_face_nodes + m;
 		}
 
 		assert(ii == result.size());
