@@ -2,7 +2,6 @@
 #include <polyfem/Common.hpp>
 #include <polyfem/assembler/Mass.hpp>
 #include <polyfem/assembler/ViscousDamping.hpp>
-#include <polyfem/optimization/CacheLevel.hpp>
 #include <polyfem/utils/Logger.hpp>
 #include <polyfem/utils/StringUtils.hpp>
 #include <polyfem/utils/MaybeParallelFor.hpp>
@@ -73,7 +72,7 @@ namespace polyfem
 			args["solver"]["contact"]["CCD"]["broad_phase"],
 			args["solver"]["contact"]["CCD"]["tolerance"],
 			args["solver"]["contact"]["CCD"]["max_iterations"],
-			optimization_enabled == solver::CacheLevel::Derivatives,
+			optimization_enabled,
 			// Smooth Contact Form
 			args["contact"]["use_gcp_formulation"],
 			args["contact"]["alpha_t"],
@@ -307,6 +306,7 @@ namespace polyfem
 
 		init_homogenization_solve(t0);
 
+		const int t_offset = args["output"]["data"]["file_index_offset"].get<int>();
 		const int dim = mesh->dimension();
 		Eigen::MatrixXd extended_sol;
 		for (int t = 0; t <= time_steps; ++t)
@@ -323,7 +323,7 @@ namespace polyfem
 				return;
 
 			// Always save the solution for consistency
-			save_timestep(t0 + dt * t, t, t0, dt, sol, Eigen::MatrixXd()); // no pressure
+			save_timestep(t0 + dt * t, t + t_offset, t0, dt, sol, Eigen::MatrixXd()); // no pressure
 
 			{
 				POLYFEM_SCOPED_TIMER("Update quantities");
