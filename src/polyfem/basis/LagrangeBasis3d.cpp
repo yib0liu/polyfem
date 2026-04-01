@@ -632,24 +632,9 @@ namespace
 		{
 			const auto index = e[le];
 			auto neighs = mesh.edge_neighs(index.edge);
-			// int min_q = discr_order.size() > 0 ? discr_order(c) : 0;
 
-			// TODO prism: not conforming
-			// for (auto cid : neighs)
-			// {
-			// 	min_q = std::min(min_q, discr_order.size() > 0 ? discr_order(cid) : 0);
-			// }
-
-			// if (discr_order.size() > 0 && discr_order(c) > min_q)
-			// {
-			// 	for (int tmp = 0; tmp < q - 1; ++tmp)
-			// 		res.push_back(-le - 10);
-			// }
-			// else
-			{
-				auto node_ids = nodes.node_ids_from_edge(index, (le < 6 ? p : q) - 1);
-				res.insert(res.end(), node_ids.begin(), node_ids.end());
-			}
+			auto node_ids = nodes.node_ids_from_edge(index, (le < 6 ? p : q) - 1);
+			res.insert(res.end(), node_ids.begin(), node_ids.end());
 		}
 		assert(res.size() == size_t(6 + n_edge_nodes));
 
@@ -657,32 +642,20 @@ namespace
 		for (int lf = 0; lf < f.rows(); ++lf)
 		{
 			const auto index = f[lf];
-			const auto other_cell = mesh.switch_element(index).element;
 
-			// TODO prism: not conforming
-			//  const bool skip_other = discr_order.size() > 0 && other_cell >= 0 && discr_order(c) > discr_order(other_cell);
-
-			// if (skip_other)
-			// {
-			// 	for (int tmp = 0; tmp < n_loc_f; ++tmp)
-			// 		res.push_back(-lf - 1);
-			// }
-			// else
+			// todo prism, nodes are not necessarly a square
+			auto node_ids = nodes.node_ids_from_face(index, lf < 2 ? (p - 2) : (p - 1), lf < 2 ? -1 : (q - 1));
+			if (lf < 2)
 			{
-				// todo prism, nodes are not necessarly a square
-				auto node_ids = nodes.node_ids_from_face(index, lf < 2 ? (p - 2) : (p - 1), lf < 2 ? -1 : (q - 1));
-				if (lf < 2)
-				{
-					std::cout << node_ids.size() << " face nodes for triangular face " << lf << ", supposed to be " << n_face_nodest << std::endl;
-				}
-				else
-				{
-					std::cout << node_ids.size() << " face nodes for quad face " << lf << ", supposed to be " << n_face_nodesq << std::endl;
-				}
-				assert((lf < 2 && node_ids.size() == n_face_nodest) || (lf >= 2 && node_ids.size() == n_face_nodesq));
-				// assert(node_ids.size() == n_loc_f);
-				res.insert(res.end(), node_ids.begin(), node_ids.end());
+				std::cout << node_ids.size() << " face nodes for triangular face " << lf << ", supposed to be " << n_face_nodest << std::endl;
 			}
+			else
+			{
+				std::cout << node_ids.size() << " face nodes for quad face " << lf << ", supposed to be " << n_face_nodesq << std::endl;
+			}
+			assert((lf < 2 && node_ids.size() == n_face_nodest) || (lf >= 2 && node_ids.size() == n_face_nodesq));
+			// assert(node_ids.size() == n_loc_f);
+			res.insert(res.end(), node_ids.begin(), node_ids.end());
 		}
 		assert(res.size() == size_t(6 + n_edge_nodes + n_face_nodes));
 

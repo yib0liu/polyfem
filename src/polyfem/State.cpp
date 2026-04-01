@@ -675,7 +675,6 @@ namespace polyfem
 				disc_orders[e] = max_order;
 			}
 		}
-		logger().info("0: {} 1: {}", disc_orders[0], disc_orders[1]);
 		logger().info("min p: {} max p: {}", disc_orders.minCoeff(), disc_orders.maxCoeff());
 
 		igl::Timer timer;

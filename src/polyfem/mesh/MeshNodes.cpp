@@ -396,29 +396,59 @@ namespace polyfem::mesh
 		if (start_node_id < 0 || !connect_nodes_)
 		{
 			int loc_index = 0;
-			const int endi = is_tri ? n_new_nodes : n_new_nodes;
-			for (int i = 1; i <= endi; ++i)
+
+			if (mesh3d->is_prism(index.element))
 			{
-				const int end = is_tri ? (n_new_nodes - i + 1) : n_new_nodesq;
-				for (int j = 1; j <= end; ++j)
+				const bool is_on_tri_face = mesh3d->n_face_vertices(mesh3d->switch_face(index).face) == 3;
+
+				for (int i = 1; i <= n_new_nodes; ++i)
 				{
-					const int primitive_id = start + loc_index;
-					std::cout << "node_id_from_facem at face " << index.face << " at position (" << i << ", " << j << ")" << std::endl;
+					for (int j = 1; j <= n_new_nodesq; ++j)
+					{
+						const int ii = is_on_tri_face ? i : j;
+						const int jj = is_on_tri_face ? j : i;
 
-					const auto [node, node_id] = mesh3d->face_node(index, n_new_nodes, n_new_nodesq, i, j); // ?
+						const int primitive_id = start + loc_index;
+						const auto [node, node_id] = mesh3d->face_node(index, n_new_nodes, n_new_nodesq, ii, jj);
 
-					primitive_to_node_[primitive_id] = n_nodes();
+						primitive_to_node_[primitive_id] = n_nodes();
 
-					in_ordered_vertices_.push_back(node_id);
-					node_to_primitive_.push_back(primitive_id);
-					node_to_primitive_gid_.push_back(index.face);
+						in_ordered_vertices_.push_back(node_id);
+						node_to_primitive_.push_back(primitive_id);
+						node_to_primitive_gid_.push_back(index.face);
 
-					nodes_.row(primitive_id) = node;
+						nodes_.row(primitive_id) = node;
 
-					res.push_back(primitive_to_node_[primitive_id]);
-					assert(in_ordered_vertices_.size() == n_nodes());
+						res.push_back(primitive_to_node_[primitive_id]);
+						assert(in_ordered_vertices_.size() == n_nodes());
 
-					++loc_index;
+						++loc_index;
+					}
+				}
+			}
+			else
+			{
+				for (int i = 1; i <= n_new_nodes; ++i)
+				{
+					const int end = is_tri ? (n_new_nodes - i + 1) : n_new_nodes;
+					for (int j = 1; j <= end; ++j)
+					{
+						const int primitive_id = start + loc_index;
+						const auto [node, node_id] = mesh3d->face_node(index, n_new_nodes, i, j);
+
+						primitive_to_node_[primitive_id] = n_nodes();
+
+						in_ordered_vertices_.push_back(node_id);
+						node_to_primitive_.push_back(primitive_id);
+						node_to_primitive_gid_.push_back(index.face);
+
+						nodes_.row(primitive_id) = node;
+
+						res.push_back(primitive_to_node_[primitive_id]);
+						assert(in_ordered_vertices_.size() == n_nodes());
+
+						++loc_index;
+					}
 				}
 			}
 		}
@@ -430,15 +460,13 @@ namespace polyfem::mesh
 			}
 			else
 			{
-				const int total_nodes = is_tri ? (n_new_nodes * (n_new_nodes + 1) / 2) : (n_new_nodes * n_new_nodesq);
-				const int endi = is_tri ? n_new_nodes : n_new_nodesq;
-				for (int i = 1; i <= endi; ++i)
+				const int total_nodes = is_tri ? (n_new_nodes * (n_new_nodes + 1) / 2) : (n_new_nodes * n_new_nodes);
+				for (int i = 1; i <= n_new_nodes; ++i)
 				{
 					const int end = is_tri ? (n_new_nodes - i + 1) : n_new_nodes;
 					for (int j = 1; j <= end; ++j)
 					{
-						std::cout << "Looking for node on face " << index.face << " at position (" << i << ", " << j << ")" << std::endl;
-						const auto [p, _] = mesh3d->face_node(index, n_new_nodes, n_new_nodesq, i, j); // ?
+						const auto [p, _] = mesh3d->face_node(index, n_new_nodes, i, j);
 
 						bool found = false;
 						for (int k = start; k < start + total_nodes; ++k)
@@ -562,7 +590,7 @@ namespace polyfem::mesh
 		else
 			assert(res.size() == size_t(n_new_nodes * n_new_nodes));
 #endif
-			return res;
+		return res;
 	}
 
 	std::vector<int> MeshNodes::node_ids_from_cell(const Navigation3D::Index &index, const int n_new_nodes)
