@@ -98,20 +98,18 @@ namespace polyfem
 
 		std::pair<RowVectorNd, int> Mesh3D::face_node(const Navigation3D::Index &index, const int n_new_nodes, const int n_new_nodesq, const int i, const int j) const
 		{
+			assert(is_prism(index.element));
+
 			const int tmp = n_new_nodes == 2 ? 3 : n_new_nodes; // ?
 
-			const bool is_prism_tri = is_prism(index.element) && n_face_vertices(index.face) == 3;
-			const bool is_prism_quad = is_prism(index.element) && n_face_vertices(index.face) == 4;
+			const bool is_prism_tri = n_face_vertices(index.face) == 3;
+			const bool is_prism_quad = n_face_vertices(index.face) == 4;
 
-			const bool is_pyramid_tri = is_pyramid(index.element) && n_face_vertices(index.face) == 3;
-			const bool is_pyramid_quad = is_pyramid(index.element) && n_face_vertices(index.face) == 4;
-
-			std::cout << "face node, orders_.size() " << orders_.size() << std::endl;
-			for (int i = 0; i < face_nodes_.size(); ++i)
-			{
-				std::cout << "face " << i << ": " << face_nodes_[i].nodes.rows() << " nodes" << std::endl;
-			}
-			if (is_simplex(index.element) || is_prism_tri || is_pyramid_tri)
+			// for (int i = 0; i < face_nodes_.size(); ++i)
+			// {
+			// 	std::cout << "face " << i << ": " << face_nodes_[i].nodes.rows() << " nodes" << std::endl;
+			// }
+			if (is_prism_tri)
 			{
 				if (orders_.size() <= 0 || orders_(index.element) == 1 || orders_(index.element) == 2 || face_nodes_.empty() || face_nodes_[index.face].nodes.rows() != tmp)
 				{
@@ -135,7 +133,7 @@ namespace polyfem
 				const auto &n = face_nodes_[index.face];
 				int lindex = jj * n_new_nodes + ii;
 
-				if (orders_(index.element) == 4)
+				if (orders_(index.element) == 4) // high order geometric mesh
 				{
 					static const std::array<int, 3> remapping = {{0, 2, 1}};
 					if (n.v1 == index.vertex)
@@ -188,11 +186,10 @@ namespace polyfem
 
 				return std::make_pair(n.nodes.row(lindex), n.nodes_ids[lindex]);
 			}
-			else if (is_cube(index.element) || is_prism_quad || is_pyramid_quad)
+			else if (is_prism_quad)
 			{
 				// supports only blilinear quads
-				// std::cout << "face node, orders_.size() " << orders_.size() << std::endl; // why 0???
-				assert(orders_.size() <= 0 || orders_(index.element) == 1); // ???
+				assert(orders_.size() <= 0 || orders_(index.element) == 1);
 
 				const int lindex = (j - 1) * n_new_nodes + (i - 1);
 
@@ -236,15 +233,14 @@ namespace polyfem
 
 		std::pair<RowVectorNd, int> Mesh3D::face_node(const Navigation3D::Index &index, const int n_new_nodes, const int i, const int j) const
 		{
-			const int tmp = n_new_nodes == 2 ? 3 : n_new_nodes;
+			assert(!is_prism(index.element));
 
-			const bool is_prism_tri = is_prism(index.element) && n_face_vertices(index.face) == 3;
-			const bool is_prism_quad = is_prism(index.element) && n_face_vertices(index.face) == 4;
+			const int tmp = n_new_nodes == 2 ? 3 : n_new_nodes;
 
 			const bool is_pyramid_tri = is_pyramid(index.element) && n_face_vertices(index.face) == 3;
 			const bool is_pyramid_quad = is_pyramid(index.element) && n_face_vertices(index.face) == 4;
 
-			if (is_simplex(index.element) || is_prism_tri || is_pyramid_tri)
+			if (is_simplex(index.element) || is_pyramid_tri)
 			{
 				if (orders_.size() <= 0 || orders_(index.element) == 1 || orders_(index.element) == 2 || face_nodes_.empty() || face_nodes_[index.face].nodes.rows() != tmp)
 				{
@@ -321,7 +317,7 @@ namespace polyfem
 
 				return std::make_pair(n.nodes.row(lindex), n.nodes_ids[lindex]);
 			}
-			else if (is_cube(index.element) || is_prism_quad || is_pyramid_quad)
+			else if (is_cube(index.element) || is_pyramid_quad)
 			{
 				// supports only blilinear quads
 				assert(orders_.size() <= 0 || orders_(index.element) == 1);
