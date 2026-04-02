@@ -458,19 +458,46 @@ namespace polyfem::mesh
 		}
 		else // find existing nodes, todo
 		{
-			if (n_new_nodes == 1)
+			if (is_tri)
 			{
-				res.push_back(start_node_id);
+				const int total_nodes = n_new_nodes * (n_new_nodes + 1) / 2;
+				for (int i = 1; i <= n_new_nodes; ++i)
+				{
+					const int end = n_new_nodes - i + 1;
+					for (int j = 1; j <= end; ++j)
+					{
+						const auto [p, _] = mesh3d->face_node(index, n_new_nodes, n_new_nodesq, i, j);
+
+						bool found = false;
+						for (int k = start; k < start + total_nodes; ++k)
+						{
+							const double dist = (nodes_.row(k) - p).norm();
+							if (dist < 1e-10)
+							{
+								res.push_back(primitive_to_node_[k]);
+								found = true;
+								break;
+							}
+						}
+
+						assert(found);
+					}
+				}
 			}
 			else
 			{
-				const int total_nodes = is_tri ? (n_new_nodes * (n_new_nodes + 1) / 2) : (n_new_nodes * n_new_nodes);
+				const bool is_on_tri_face = mesh3d->n_face_vertices(mesh3d->switch_face(index).face) == 3; // on quad face, next to tri face
+				if (is_on_tri_face)
+					index = mesh3d->next_around_face(index);
+				assert(mesh3d->n_face_vertices(mesh3d->switch_face(index).face) == 4); // on quad face, next to quad face
+
+				const int total_nodes = n_new_nodes * n_new_nodesq;
 				for (int i = 1; i <= n_new_nodes; ++i)
 				{
-					const int end = is_tri ? (n_new_nodes - i + 1) : n_new_nodes;
+					const int end = n_new_nodesq;
 					for (int j = 1; j <= end; ++j)
 					{
-						const auto [p, _] = mesh3d->face_node(index, n_new_nodes, n_new_nodesq, i, j); // todo
+						const auto [p, _] = mesh3d->face_node(index, n_new_nodes, n_new_nodesq, j, i);
 
 						bool found = false;
 						for (int k = start; k < start + total_nodes; ++k)

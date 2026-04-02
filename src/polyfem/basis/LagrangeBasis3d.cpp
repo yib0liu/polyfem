@@ -2091,9 +2091,6 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 
 			// found le, know reverse
 
-			int cur_order = (le < 6) ? p : q;
-			int n_e_nodes = cur_order - 1;
-
 			if (le < 6)
 			{
 				if (!reverse)
@@ -2154,7 +2151,7 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 		{
 			result[ii++] = 6 + global_n_edges_nodes + lf;
 		}
-		else if (n_face_nodes != 0)
+		else if (n_face_nodes == 2)
 		{
 			Eigen::MatrixXd nodes;
 			autogen::prism_nodes_3d(p, q, nodes);
@@ -2187,36 +2184,29 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 
 				double dist = (node_bary - bary).norm();
 
-				if (dist < 1e-10)
+				if (dist < 1e-10) // find which quad face
 				{
-					int sum = 0;
-
-					for (int m = 0; m < 4; ++m) // m is on query index, the 4 corner nodes of the face
+					auto t = pos.row(0);
+					int min_n = -1;
+					double min_dis = 10000;
+					for (int n = 0; n < n_face_nodes; ++n)
 					{
-						auto t = pos.row(m); // ??? should be face nodes?
-						int min_n = -1;
-						double min_dis = 10000;
-
-						for (int n = 0; n < n_face_nodes; ++n)
+						double dis = (loc_nodes.row(n) - t).squaredNorm();
+						if (dis < min_dis)
 						{
-							double dis = (loc_nodes.row(n) - t).squaredNorm();
-							if (dis < min_dis)
-							{
-								min_dis = dis;
-								min_n = n;
-							}
+							min_dis = dis;
+							min_n = n;
 						}
-
-						assert(min_n >= 0);
-						assert(min_n < n_face_nodes);
-
-						sum += min_n;
-
-						int final_idx = 6 + global_n_edges_nodes + min_n + lf * n_face_nodes + 2 * n_tri_face_nodes;
-						result[ii++] = final_idx;
 					}
 
-					assert(sum == n_face_nodes * (n_face_nodes - 1) / 2);
+					assert(min_n >= 0);
+					assert(min_n < n_face_nodes);
+
+					int final_idx = 6 + global_n_edges_nodes + min_n + lf * n_face_nodes + 2 * n_tri_face_nodes;
+					result[ii++] = final_idx;
+
+					final_idx = 6 + global_n_edges_nodes + (min_n + 1) % 2 + lf * n_face_nodes + 2 * n_tri_face_nodes;
+					result[ii++] = final_idx;
 
 					found = true;
 					assert(lff == lf);
