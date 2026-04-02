@@ -364,8 +364,10 @@ namespace polyfem::mesh
 		return res;
 	}
 
-	std::vector<int> MeshNodes::node_ids_from_face(const Navigation3D::Index &index, const int n_new_nodes, const int n_new_nodesq)
+	std::vector<int> MeshNodes::node_ids_from_face(const Navigation3D::Index &index1, const int n_new_nodes, const int n_new_nodesq)
 	{
+		Navigation3D::Index index = index1;
+
 		std::vector<int> res;
 		if (n_new_nodes <= 0)
 			return res;
@@ -428,12 +430,15 @@ namespace polyfem::mesh
 				{
 					const bool is_on_tri_face = mesh3d->n_face_vertices(mesh3d->switch_face(index).face) == 3; // on quad face, next to tri face
 
+					if (is_on_tri_face)
+						index = mesh3d->next_around_face(index);
+					assert(mesh3d->n_face_vertices(mesh3d->switch_face(index).face) == 4);
 					for (int i = 1; i <= n_new_nodes; ++i)
 					{
 						for (int j = 1; j <= n_new_nodesq; ++j)
 						{
-							const int ii = is_on_tri_face ? i : j;
-							const int jj = is_on_tri_face ? j : i;
+							const int ii = j;
+							const int jj = i;
 
 							const int primitive_id = start + loc_index;
 							const auto [node, node_id] = mesh3d->face_node(index, n_new_nodes, n_new_nodesq, ii, jj);
@@ -686,9 +691,21 @@ namespace polyfem::mesh
 		}
 		else if (mesh3d->is_prism(index.element))
 		{
-			// TODO: implement me internal prism nodes
-			log_and_throw_error("Prism internal nodes not implemented yet");
-			assert(false);
+			assert(n_new_nodes == 1);
+			int loc_index = 0;
+
+			const int primitive_id = start + loc_index;
+
+			const auto [node, node_id] = mesh3d->cell_node(index, n_new_nodes, 0, 0, 0);
+			primitive_to_node_[primitive_id] = n_nodes();
+
+			in_ordered_vertices_.push_back(node_id);
+			node_to_primitive_.push_back(primitive_id);
+			node_to_primitive_gid_.push_back(index.element);
+
+			nodes_.row(primitive_id) = node;
+			res.push_back(primitive_to_node_[primitive_id]);
+			assert(in_ordered_vertices_.size() == n_nodes());
 		}
 		else if (mesh3d->is_pyramid(index.element))
 		{

@@ -645,14 +645,6 @@ namespace
 
 			// todo prism, nodes are not necessarly a square
 			auto node_ids = nodes.node_ids_from_face(index, lf < 2 ? (p - 2) : (p - 1), lf < 2 ? -1 : (q - 1));
-			if (lf < 2)
-			{
-				std::cout << node_ids.size() << " face nodes for triangular face " << lf << ", supposed to be " << n_face_nodest << std::endl;
-			}
-			else
-			{
-				std::cout << node_ids.size() << " face nodes for quad face " << lf << ", supposed to be " << n_face_nodesq << std::endl;
-			}
 			assert((lf < 2 && node_ids.size() == n_face_nodest) || (lf >= 2 && node_ids.size() == n_face_nodesq));
 			// assert(node_ids.size() == n_loc_f);
 			res.insert(res.end(), node_ids.begin(), node_ids.end());
@@ -662,9 +654,6 @@ namespace
 		// cells
 		if (n_cell_nodes > 0)
 		{
-			// TODO: implement me internal prism nodes
-			log_and_throw_error("Prism internal nodes not implemented yet");
-
 			const auto index = f[0];
 
 			auto node_ids = nodes.node_ids_from_cell(index, q - 1);
