@@ -665,12 +665,16 @@ namespace polyfem
 				max_order = std::max(p, q);
 			}
 		}
-		logger().info("max order: {}", max_order);
-		for (int e = 0; e < mesh->n_elements(); ++e)
+		logger().info("max prism order: {}", max_order);
+
+		if (max_order > 0) // if prism dominant
 		{
-			if (mesh->is_simplex(e))
+			for (int e = 0; e < mesh->n_elements(); ++e)
 			{
-				disc_orders[e] = max_order;
+				if (mesh->is_simplex(e))
+				{
+					disc_orders[e] = max_order;
+				}
 			}
 		}
 		logger().info("min p: {} max p: {}", disc_orders.minCoeff(), disc_orders.maxCoeff());
@@ -840,11 +844,11 @@ namespace polyfem
 			logger().debug("Done (took {}s)", timer2.getElapsedTime());
 		}
 
-		logger().info("Building collision mesh...");
-		build_collision_mesh();
-		if (periodic_bc && args["contact"]["periodic"])
-			build_periodic_collision_mesh();
-		logger().info("Done!");
+		// logger().info("Building collision mesh...");
+		// build_collision_mesh();
+		// if (periodic_bc && args["contact"]["periodic"])
+		// 	build_periodic_collision_mesh();
+		// logger().info("Done!");
 
 		const int prev_b_size = local_boundary.size();
 		problem->setup_bc(*mesh, n_bases - obstacle.n_vertices(),
