@@ -420,9 +420,39 @@ namespace polyfem
 				}
 				return std::make_pair(RowVectorNd{{xv, yv, zv}}, -1);
 			}
+			else if (is_prism(index.element))
+			{
+				assert(orders_.size() <= 0 || orders_(index.element) == 1);
+				assert(n_new_nodes == 2); // p=3 q=3
 
-			assert(false);
-			return std::make_pair(RowVectorNd(3, 1), -1);
+				std::array<int, 6> vertices = get_ordered_vertices_from_prism(index.element);
+				const auto v1 = point(vertices[0]);
+				const auto v2 = point(vertices[1]);
+				const auto v3 = point(vertices[2]);
+				const auto v4 = point(vertices[3]);
+				const auto v5 = point(vertices[4]);
+				const auto v6 = point(vertices[5]);
+
+				RowVectorNd barycenter1 = (v1 + v2 + v3) / 3.0;
+				RowVectorNd barycenter2 = (v4 + v5 + v6) / 3.0;
+				RowVectorNd interp1 = barycenter1 * 2.0 / 3.0 + barycenter2 / 3.0;
+				RowVectorNd interp2 = barycenter1 / 3.0 + barycenter2 * 2.0 / 3.0;
+
+				assert(index.vertex == vertices[0]);
+				// std::cout << "v: " << v1 << " " << v2 << " " << v3 << " " << v4 << " " << v5 << " " << v6 << std::endl;
+				// std::cout << "bary1: " << barycenter1 << " bary2: " << barycenter2 << std::endl;
+				// std::cout << "interp1: " << interp1 << " interp2: " << interp2 << std::endl;
+
+				if (k == 1)
+					return std::make_pair(interp1, -1);
+				else
+					return std::make_pair(interp2, -1);
+			}
+			else
+			{
+				assert(false);
+				return std::make_pair(RowVectorNd(3, 1), -1);
+			}
 		}
 
 		void Mesh3D::to_face_functions(std::array<std::function<Navigation3D::Index(Navigation3D::Index)>, 6> &to_face) const

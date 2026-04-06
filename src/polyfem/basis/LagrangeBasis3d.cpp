@@ -654,9 +654,9 @@ namespace
 		// cells
 		if (n_cell_nodes > 0)
 		{
-			const auto index = f[0];
+			const auto index = f[0]; // aligned bottom tri face
 
-			auto node_ids = nodes.node_ids_from_cell(index, q - 1);
+			auto node_ids = nodes.node_ids_from_cell(index, n_cell_nodes);
 			res.insert(res.end(), node_ids.begin(), node_ids.end());
 		}
 
@@ -2217,6 +2217,92 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 			}
 
 			assert(found);
+		}
+		else if (n_face_nodes == 4)
+		{
+			Eigen::MatrixXd nodes;
+			autogen::prism_nodes_3d(p, q, nodes);
+			for (int i = 0; i < nodes.rows(); ++i)
+			{
+				std::cout << "node " << i << ": " << nodes.row(i) << std::endl
+						  << std::flush;
+			}
+
+			std::array<int, 4> idx; // local node id of the 4 face vertices
+			for (int lv = 0; lv < 4; ++lv)
+			{
+				idx[lv] = find_index(l2g.begin(), l2g.end(), index.vertex);
+				index = mesh.next_around_face(index);
+			}
+
+			Eigen::Matrix<double, 4, 3> pos(4, 3); // local (on ref) coordinates of the 4 face corner nodes
+			pos.row(0) = nodes.row(idx[0]);
+			pos.row(1) = nodes.row(idx[1]);
+			pos.row(2) = nodes.row(idx[3]);
+			pos.row(3) = nodes.row(idx[2]);
+			std::cout << "face nodes pos: " << pos << std::endl
+					  << std::flush;
+			// int cnt = 0;
+			// for (int i : idx)
+			// {
+			// 	pos.row(cnt++) = nodes.row(i);
+			// }
+			// Eigen::RowVector3d tmp = pos.row(3);
+			// pos.row(3) = pos.row(2);
+			// pos.row(2) = tmp;
+
+			const Eigen::RowVector3d bary = pos.colwise().mean();
+
+			const int offset = 6 + global_n_edges_nodes;
+
+			bool found = false;
+			for (int lff = 0; lff < 3; ++lff)
+			{
+				int start_row = offset + lff * n_face_nodes + 2 * n_tri_face_nodes; // skip tri face nodes
+
+				Eigen::MatrixXd loc_nodes = nodes.block(start_row, 0, n_face_nodes, 3);
+				Eigen::RowVector3d node_bary = loc_nodes.colwise().mean();
+
+				if ((node_bary - bary).norm() < 1e-10)
+				{
+					int sum = 0;
+					for (int m = 0; m < 4; ++m)
+					{
+						auto t = pos.row(m);
+						int min_n = -1;
+						double min_dis = 10000;
+
+						for (int n = 0; n < 4; ++n)
+						{
+							double dis = (loc_nodes.row(n) - t).squaredNorm();
+							if (dis < min_dis)
+							{
+								min_dis = dis;
+								min_n = n;
+							}
+						}
+
+						assert(min_n >= 0);
+						assert(min_n < 4);
+
+						sum += min_n;
+
+						result[ii++] = 6 + global_n_edges_nodes + min_n + lf * n_face_nodes + 2 * n_tri_face_nodes;
+					}
+
+					assert(sum == 6); // 0 + 1 + 2 + 3
+
+					found = true;
+					assert(lff == lf);
+				}
+
+				if (found)
+					break;
+			}
+		}
+		else
+		{
+			assert(n_face_nodes == 0);
 		}
 
 		assert(ii == result.size());

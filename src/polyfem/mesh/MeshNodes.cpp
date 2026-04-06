@@ -691,21 +691,52 @@ namespace polyfem::mesh
 		}
 		else if (mesh3d->is_prism(index.element))
 		{
-			assert(n_new_nodes == 1);
-			int loc_index = 0;
+			if (n_new_nodes == 1)
+			{
+				assert(false); // tmp for 3 3
+				int loc_index = 0;
 
-			const int primitive_id = start + loc_index;
+				const int primitive_id = start + loc_index;
 
-			const auto [node, node_id] = mesh3d->cell_node(index, n_new_nodes, 0, 0, 0);
-			primitive_to_node_[primitive_id] = n_nodes();
+				const auto [node, node_id] = mesh3d->cell_node(index, n_new_nodes, 0, 0, 0);
+				primitive_to_node_[primitive_id] = n_nodes();
 
-			in_ordered_vertices_.push_back(node_id);
-			node_to_primitive_.push_back(primitive_id);
-			node_to_primitive_gid_.push_back(index.element);
+				in_ordered_vertices_.push_back(node_id);
+				node_to_primitive_.push_back(primitive_id);
+				node_to_primitive_gid_.push_back(index.element);
 
-			nodes_.row(primitive_id) = node;
-			res.push_back(primitive_to_node_[primitive_id]);
-			assert(in_ordered_vertices_.size() == n_nodes());
+				nodes_.row(primitive_id) = node;
+				res.push_back(primitive_to_node_[primitive_id]);
+				assert(in_ordered_vertices_.size() == n_nodes());
+			}
+			else if (n_new_nodes == 2)
+			{
+				assert(mesh3d->n_face_vertices(index.face) == 3); // on bottom tri face, aligned outside
+
+				int loc_index = 0;
+
+				for (int i = 0; i < n_new_nodes; ++i)
+				{
+					const int primitive_id = start + loc_index;
+
+					const auto [node, node_id] = mesh3d->cell_node(index, n_new_nodes, 0, 0, i);
+					primitive_to_node_[primitive_id] = n_nodes();
+
+					in_ordered_vertices_.push_back(node_id);
+					node_to_primitive_.push_back(primitive_id);
+					node_to_primitive_gid_.push_back(index.element);
+
+					nodes_.row(primitive_id) = node;
+					res.push_back(primitive_to_node_[primitive_id]);
+					assert(in_ordered_vertices_.size() == n_nodes());
+
+					++loc_index;
+				}
+			}
+			else
+			{
+				assert(false);
+			}
 		}
 		else if (mesh3d->is_pyramid(index.element))
 		{
