@@ -679,6 +679,27 @@ namespace polyfem
 		}
 		logger().info("min p: {} max p: {}", disc_orders.minCoeff(), disc_orders.maxCoeff());
 
+		// DO NOT DELETE DEBUG CODE
+		for (int e = 0; e < mesh->n_edges(); ++e)
+		{
+			logger().debug("edge {}, v1: {}, v2: {}", e, mesh->edge_vertex(e, 0), mesh->edge_vertex(e, 1));
+		}
+
+		for (int f = 0; f < mesh->n_faces(); ++f)
+		{
+			logger().debug("face {}", f);
+			for (int i = 0; i < mesh->n_face_vertices(f); ++i)
+			{
+				logger().debug("v{}: {}", i, mesh->face_vertex(f, i));
+			}
+		}
+
+		for (int c = 0; c < mesh->n_cells(); ++c)
+		{
+			logger().debug("cell {}: {}", c, mesh->element_vertices(c));
+		}
+		// DO NOT DELETE DEBUG CODE
+
 		igl::Timer timer;
 		timer.start();
 		if (args["space"]["use_p_ref"])
