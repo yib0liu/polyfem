@@ -2240,13 +2240,13 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 			pos.row(1) = nodes.row(idx[1]);
 			pos.row(2) = nodes.row(idx[3]);
 			pos.row(3) = nodes.row(idx[2]);
-			std::cout << "face nodes pos: " << pos << std::endl
-					  << std::flush;
 			// int cnt = 0;
 			// for (int i : idx)
 			// {
 			// 	pos.row(cnt++) = nodes.row(i);
 			// }
+			std::cout << "face nodes pos: " << pos << std::endl
+					  << std::flush;
 			// Eigen::RowVector3d tmp = pos.row(3);
 			// pos.row(3) = pos.row(2);
 			// pos.row(2) = tmp;
@@ -2261,6 +2261,12 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 				int start_row = offset + lff * n_face_nodes + 2 * n_tri_face_nodes; // skip tri face nodes
 
 				Eigen::MatrixXd loc_nodes = nodes.block(start_row, 0, n_face_nodes, 3);
+				std::cout << "\n[DEBUG] --- loc_nodes (face " << lff << ") ---" << std::endl;
+				std::cout << loc_nodes << std::endl;
+				std::cout << "[DEBUG] ----------------------------\n"
+						  << std::endl
+						  << std::flush;
+
 				Eigen::RowVector3d node_bary = loc_nodes.colwise().mean();
 
 				if ((node_bary - bary).norm() < 1e-10)
@@ -2282,12 +2288,16 @@ Eigen::VectorXi LagrangeBasis3d::prism_face_local_nodes(const int p, const int q
 							}
 						}
 
+						std::cout << "  [DEBUG] face local vertex m: " << m << " position t: " << t
+								  << "] -> matched face node n: " << min_n << " position: " << loc_nodes.row(min_n) << " dist: " << min_dis << std::endl;
+
 						assert(min_n >= 0);
 						assert(min_n < 4);
 
 						sum += min_n;
 
-						result[ii++] = 6 + global_n_edges_nodes + min_n + lf * n_face_nodes + 2 * n_tri_face_nodes;
+						result[ii++] = 6 + global_n_edges_nodes + min_n + lff * n_face_nodes + 2 * n_tri_face_nodes;
+						std::cout << "  [DEBUG] Result[" << ii - 1 << "] = " << result[ii - 1] << ", coord: " << nodes.row(result[ii - 1]) << std::endl;
 					}
 
 					assert(sum == 6); // 0 + 1 + 2 + 3
