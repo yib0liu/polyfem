@@ -693,7 +693,7 @@ namespace polyfem::mesh
 		{
 			if (n_new_nodes == 1)
 			{
-				assert(false); // tmp for 3 3
+				// assert(false); // tmp for 3 3
 				int loc_index = 0;
 
 				const int primitive_id = start + loc_index;
